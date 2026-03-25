@@ -220,6 +220,7 @@ date, exercise, category, set_order, weight_kg, reps, was_pr_at_time, is_current
 - Calendar view showing days with workouts
 - Exercise view with today's sets
 - Routing between views
+- Reorder exercises and sets by dragging
 
 **Phase 3 – Exercise insights**
 - Exercise history view

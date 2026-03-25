@@ -269,13 +269,39 @@ body {
     min-width: 1.5rem;
 }
 
-.set-row .set-weight {
+.set-stats {
+    display: flex;
+    align-items: baseline;
+    gap: 0.2rem;
     flex: 1;
+    font-variant-numeric: tabular-nums;
 }
 
-.set-row .set-badge {
+.stat-val {
+    font-weight: 600;
+    font-size: 1rem;
+    display: inline-block;
+    text-align: right;
+}
+
+.stat-val--weight {
+    min-width: 6ch; /* fits up to "300.25" */
+}
+
+.stat-val--reps {
+    min-width: 3ch; /* fits up to "100" */
+    margin-left: 0.75rem; /* visual gap between kg and reps */
+}
+
+.stat-unit {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.set-badge {
     min-width: 2rem;
     text-align: right;
+    flex-shrink: 0;
 }
 
 .empty {
@@ -384,6 +410,19 @@ body {
 .cal-day--empty {
     cursor: default;
     pointer-events: none;
+}
+
+.drag-handle {
+    color: var(--text-muted);
+    font-size: 1rem;
+    cursor: grab;
+    padding-right: 0.5rem;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
 }
 
 .cal-dot {
