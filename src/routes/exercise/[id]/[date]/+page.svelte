@@ -2,6 +2,7 @@
     import { page } from "$app/state";
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
+    import { dndzone } from "svelte-dnd-action";
 
     type Set = {
         id: number;
@@ -53,6 +54,11 @@
         }
     }
 
+    function formatWeight(kg: number): string {
+        const f2 = kg.toFixed(2);
+        return f2.endsWith("0") ? kg.toFixed(1) : f2;
+    }
+
     async function refreshSets() {
         const workout = await invoke<ExerciseWithSets[]>("get_workout_for_date", { date });
         sets = workout.find((e) => e.exercise_id === exerciseId)?.sets ?? [];
@@ -95,6 +101,19 @@
         await refreshSets();
         defaultToLastSet(sets);
     }
+
+    function handleSetConsider(e: CustomEvent) {
+        sets = e.detail.items;
+    }
+
+    function handleSetFinalize(e: CustomEvent) {
+        sets = e.detail.items;
+        invoke("reorder_sets", {
+            date,
+            exerciseId,
+            orderedSetIds: sets.map((s) => s.id),
+        }).then(() => refreshSets());
+    }
 </script>
 
 <div class="page">
@@ -106,15 +125,24 @@
     {#if sets.length === 0}
         <p class="empty">No sets yet. Add your first set below.</p>
     {:else}
-        <div class="list">
-            {#each sets as set}
+        <div
+            class="list"
+            use:dndzone={{ items: sets, flipDurationMs: 150 }}
+            onconsider={handleSetConsider}
+            onfinalize={handleSetFinalize}
+        >
+            {#each sets as set (set.id)}
                 <button
                     class="list-item"
                     class:list-item--selected={set_selected?.id === set.id}
                     onclick={() => selectSet(set)}
                 >
-                    <span>{set.weight_kg} kg × {set.reps}</span>
-                    <span>
+                    <span class="drag-handle">≡</span>
+                    <span class="set-stats">
+                        <span class="stat-val stat-val--weight">{formatWeight(set.weight_kg)}</span><span class="stat-unit">kg</span>
+                        <span class="stat-val stat-val--reps">{set.reps}</span><span class="stat-unit">reps</span>
+                    </span>
+                    <span class="set-badge">
                         {#if set.is_current_pr}
                             <span class="pr-badge pr-badge--current">PR</span>
                         {:else if set.was_pr_at_time}

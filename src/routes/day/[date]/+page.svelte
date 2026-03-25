@@ -2,6 +2,7 @@
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import { invoke } from "@tauri-apps/api/core";
+    import { dndzone } from "svelte-dnd-action";
 
     type Set = {
         id: number;
@@ -14,6 +15,7 @@
     };
 
     type ExerciseWithSets = {
+        id: number; // alias for exercise_id, required by dndzone
         exercise_id: number;
         exercise_name: string;
         category: string;
@@ -77,13 +79,14 @@
     let categories = $state<string[]>([]);
     let selectedCategory = $state("");
     let exercisesInCategory = $state<Exercise[]>([]);
+    let dragActive = $state(false);
 
     $effect(() => {
         const d = date;
         view = "exercises";
         invoke<ExerciseWithSets[]>("get_workout_for_date", { date: d }).then(
             (result) => {
-                exercises = result;
+                exercises = result.map((e) => ({ ...e, id: e.exercise_id }));
             },
         );
     });
@@ -107,6 +110,11 @@
         goto(`/exercise/${exercise.id}/${date}`);
     }
 
+    function formatWeight(kg: number): string {
+        const f2 = kg.toFixed(2);
+        return f2.endsWith("0") ? kg.toFixed(1) : f2;
+    }
+
     function navigateDay(delta: number) {
         goto(`/day/${offsetDay(date, delta)}`);
     }
@@ -119,10 +127,25 @@
     }
 
     function handleTouchEnd(e: TouchEvent) {
+        if (dragActive) return;
         const delta = e.changedTouches[0].clientX - touchStartX;
         if (Math.abs(delta) > 50) {
             navigateDay(delta > 0 ? -1 : 1);
         }
+    }
+
+    function handleExerciseConsider(e: CustomEvent) {
+        dragActive = true;
+        exercises = e.detail.items;
+    }
+
+    function handleExerciseFinalize(e: CustomEvent) {
+        dragActive = false;
+        exercises = e.detail.items;
+        invoke("reorder_exercises", {
+            date,
+            orderedExerciseIds: exercises.map((ex) => ex.exercise_id),
+        });
     }
 </script>
 
@@ -154,14 +177,20 @@
         {#if exercises.length === 0}
             <p class="empty">No exercises logged. Add one below.</p>
         {:else}
-            <div class="list">
-                {#each exercises as ex}
+            <div
+                class="list"
+                use:dndzone={{ items: exercises, flipDurationMs: 150 }}
+                onconsider={handleExerciseConsider}
+                onfinalize={handleExerciseFinalize}
+            >
+                {#each exercises as ex (ex.id)}
                     <div class="exercise-card">
                         <button
                             class="exercise-card-header"
                             onclick={() =>
                                 goto(`/exercise/${ex.exercise_id}/${date}`)}
                         >
+                            <span class="drag-handle">≡</span>
                             <span>{ex.exercise_name}</span>
                             <span class="muted">→</span>
                         </button>
@@ -169,7 +198,10 @@
                             {#each ex.sets as set, i}
                                 <div class="set-row">
                                     <span class="set-label">{i + 1}</span>
-                                    <span class="set-weight">{set.weight_kg} kg × {set.reps}</span>
+                                    <span class="set-stats">
+                                        <span class="stat-val stat-val--weight">{formatWeight(set.weight_kg)}</span><span class="stat-unit">kg</span>
+                                        <span class="stat-val stat-val--reps">{set.reps}</span><span class="stat-unit">reps</span>
+                                    </span>
                                     <span class="set-badge">
                                         {#if set.is_current_pr}
                                             <span class="pr-badge pr-badge--current">PR</span>

@@ -292,6 +292,49 @@ fn upsert_set(
 }
 
 #[tauri::command]
+fn reorder_exercises(
+    date: &str,
+    ordered_exercise_ids: Vec<i64>,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let workout_id: i64 = conn
+        .query_row(
+            "SELECT id FROM workouts WHERE date = ?1",
+            rusqlite::params![date],
+            |r| r.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    for (i, exercise_id) in ordered_exercise_ids.iter().enumerate() {
+        conn.execute(
+            "UPDATE workout_exercises SET exercise_order = ?1 WHERE workout_id = ?2 AND exercise_id = ?3",
+            rusqlite::params![i as i64 + 1, workout_id, exercise_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn reorder_sets(
+    date: &str,
+    exercise_id: i64,
+    ordered_set_ids: Vec<i64>,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    for (i, set_id) in ordered_set_ids.iter().enumerate() {
+        conn.execute(
+            "UPDATE sets SET set_order = ?1 WHERE id = ?2",
+            rusqlite::params![i as i64 + 1, set_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    recompute_pr_flags(&conn, exercise_id)?;
+    Ok(())
+}
+
+#[tauri::command]
 fn get_active_dates(
     year: i32,
     month: u32,
@@ -570,6 +613,8 @@ pub fn run() {
             upsert_set,
             delete_set,
             get_active_dates,
+            reorder_exercises,
+            reorder_sets,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
