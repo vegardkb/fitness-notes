@@ -144,8 +144,68 @@ fn get_exercise(
     .map_err(|e| e.to_string())
 }
 
+// Recomputes both PR flags for all sets of an exercise.
+// was_pr_at_time: full chronological pass (Pareto frontier of prior sets).
+// is_current_pr: SQL update checking global dominance.
+fn recompute_pr_flags(conn: &rusqlite::Connection, exercise_id: i64) -> Result<(), String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT s.id, s.weight_kg, s.reps FROM sets s
+             JOIN workouts w ON s.workout_id = w.id
+             WHERE s.exercise_id = ?1
+             ORDER BY w.date ASC, s.set_order ASC",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let rows: Vec<(i64, f64, i64)> = stmt
+        .query_map(rusqlite::params![exercise_id], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    let mut seen: Vec<(f64, i64)> = Vec::new();
+    for (id, weight, reps) in &rows {
+        let was_pr = !seen.iter().any(|(w, r)| w >= weight && r >= reps);
+        conn.execute(
+            "UPDATE sets SET was_pr_at_time = ?1 WHERE id = ?2",
+            rusqlite::params![was_pr, id],
+        )
+        .map_err(|e| e.to_string())?;
+        seen.push((*weight, *reps));
+    }
+
+    // A set is a current PR if no other set is strictly better in at least one dimension
+    // (or equal in both but logged earlier). This ensures that among identical sets,
+    // only the chronologically first one is marked as a current PR.
+    conn.execute(
+        "UPDATE sets SET is_current_pr = NOT EXISTS (
+             SELECT 1 FROM sets s2
+             JOIN workouts w2 ON s2.workout_id = w2.id
+             JOIN workouts w1 ON sets.workout_id = w1.id
+             WHERE s2.exercise_id = sets.exercise_id
+               AND s2.id != sets.id
+               AND s2.weight_kg >= sets.weight_kg
+               AND s2.reps >= sets.reps
+               AND (
+                   s2.weight_kg > sets.weight_kg
+                   OR s2.reps > sets.reps
+                   OR w2.date < w1.date
+                   OR (w2.date = w1.date AND s2.set_order < sets.set_order)
+               )
+         )
+         WHERE exercise_id = ?1",
+        rusqlite::params![exercise_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
 #[tauri::command]
-fn add_set(
+fn upsert_set(
+    id: Option<i64>,
     date: &str,
     exercise_id: i64,
     weight_kg: f64,
@@ -155,90 +215,119 @@ fn add_set(
 ) -> Result<Set, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
 
-    // Find or create workout for this date
-    conn.execute(
-        "INSERT OR IGNORE INTO workouts (date) VALUES (?1)",
-        rusqlite::params![date],
-    )
-    .map_err(|e| e.to_string())?;
-    let workout_id: i64 = conn
-        .query_row(
-            "SELECT id FROM workouts WHERE date = ?1",
+    let set_id: i64;
+    let set_order: i64;
+
+    if let Some(existing_id) = id {
+        // Update existing set
+        set_id = existing_id;
+        conn.execute(
+            "UPDATE sets SET weight_kg = ?1, reps = ?2, notes = ?3 WHERE id = ?4",
+            rusqlite::params![weight_kg, reps, notes, set_id],
+        )
+        .map_err(|e| e.to_string())?;
+        set_order = conn
+            .query_row(
+                "SELECT set_order FROM sets WHERE id = ?1",
+                rusqlite::params![set_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+    } else {
+        // Insert new set — find or create workout and workout_exercises
+        conn.execute(
+            "INSERT OR IGNORE INTO workouts (date) VALUES (?1)",
             rusqlite::params![date],
-            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+        let workout_id: i64 = conn
+            .query_row(
+                "SELECT id FROM workouts WHERE date = ?1",
+                rusqlite::params![date],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+
+        let next_exercise_order: i64 = conn
+            .query_row(
+                "SELECT COALESCE(MAX(exercise_order), 0) + 1 FROM workout_exercises WHERE workout_id = ?1",
+                rusqlite::params![workout_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "INSERT OR IGNORE INTO workout_exercises (workout_id, exercise_id, exercise_order) VALUES (?1, ?2, ?3)",
+            rusqlite::params![workout_id, exercise_id, next_exercise_order],
         )
         .map_err(|e| e.to_string())?;
 
-    // Find or create workout_exercises entry
-    let next_exercise_order: i64 = conn
-        .query_row(
-            "SELECT COALESCE(MAX(exercise_order), 0) + 1 FROM workout_exercises WHERE workout_id = ?1",
-            rusqlite::params![workout_id],
-            |row| row.get(0),
+        set_order = conn
+            .query_row(
+                "SELECT COALESCE(MAX(set_order), 0) + 1 FROM sets WHERE workout_id = ?1 AND exercise_id = ?2",
+                rusqlite::params![workout_id, exercise_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+
+        conn.execute(
+            "INSERT INTO sets (workout_id, exercise_id, set_order, weight_kg, reps, notes, was_pr_at_time, is_current_pr)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, 0)",
+            rusqlite::params![workout_id, exercise_id, set_order, weight_kg, reps, notes],
         )
         .map_err(|e| e.to_string())?;
-    conn.execute(
-        "INSERT OR IGNORE INTO workout_exercises (workout_id, exercise_id, exercise_order) VALUES (?1, ?2, ?3)",
-        rusqlite::params![workout_id, exercise_id, next_exercise_order],
-    )
-    .map_err(|e| e.to_string())?;
+        set_id = conn.last_insert_rowid();
+    }
 
-    // Get next set_order for this exercise in this workout
-    let set_order: i64 = conn
+    recompute_pr_flags(&conn, exercise_id)?;
+
+    let (was_pr_at_time, is_current_pr) = conn
         .query_row(
-            "SELECT COALESCE(MAX(set_order), 0) + 1 FROM sets WHERE workout_id = ?1 AND exercise_id = ?2",
-            rusqlite::params![workout_id, exercise_id],
-            |row| row.get(0),
-        )
-        .map_err(|e| e.to_string())?;
-
-    // Compute was_pr_at_time: is this set dominated by any prior set for this exercise?
-    let dominated: bool = conn
-        .query_row(
-            "SELECT COUNT(*) > 0 FROM sets s
-             JOIN workouts w ON s.workout_id = w.id
-             WHERE s.exercise_id = ?1
-               AND (w.date < ?2 OR (w.date = ?2 AND s.set_order < ?3))
-               AND s.weight_kg >= ?4
-               AND s.reps >= ?5",
-            rusqlite::params![exercise_id, date, set_order, weight_kg, reps],
-            |row| row.get(0),
-        )
-        .map_err(|e| e.to_string())?;
-    let was_pr_at_time = !dominated;
-
-    // Insert the set
-    conn.execute(
-        "INSERT INTO sets (workout_id, exercise_id, set_order, weight_kg, reps, notes, was_pr_at_time, is_current_pr)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0)",
-        rusqlite::params![workout_id, exercise_id, set_order, weight_kg, reps, notes, was_pr_at_time],
-    )
-    .map_err(|e| e.to_string())?;
-    let set_id = conn.last_insert_rowid();
-
-    // Recompute is_current_pr for all sets of this exercise
-    conn.execute(
-        "UPDATE sets SET is_current_pr = NOT EXISTS (
-             SELECT 1 FROM sets s2
-             WHERE s2.exercise_id = sets.exercise_id
-               AND s2.id != sets.id
-               AND s2.weight_kg >= sets.weight_kg
-               AND s2.reps >= sets.reps
-         )
-         WHERE exercise_id = ?1",
-        rusqlite::params![exercise_id],
-    )
-    .map_err(|e| e.to_string())?;
-
-    let is_current_pr: bool = conn
-        .query_row(
-            "SELECT is_current_pr FROM sets WHERE id = ?1",
+            "SELECT was_pr_at_time, is_current_pr FROM sets WHERE id = ?1",
             rusqlite::params![set_id],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .map_err(|e| e.to_string())?;
 
     Ok(Set { id: set_id, set_order, weight_kg, reps, notes, was_pr_at_time, is_current_pr })
+}
+
+#[tauri::command]
+fn delete_set(
+    id: i64,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+
+    let (exercise_id, workout_id): (i64, i64) = conn
+        .query_row(
+            "SELECT exercise_id, workout_id FROM sets WHERE id = ?1",
+            rusqlite::params![id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(|e| e.to_string())?;
+
+    conn.execute("DELETE FROM sets WHERE id = ?1", rusqlite::params![id])
+        .map_err(|e| e.to_string())?;
+
+    // Clean up workout_exercises if no sets remain for this exercise in this workout
+    conn.execute(
+        "DELETE FROM workout_exercises WHERE workout_id = ?1 AND exercise_id = ?2
+         AND NOT EXISTS (SELECT 1 FROM sets WHERE workout_id = ?1 AND exercise_id = ?2)",
+        rusqlite::params![workout_id, exercise_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    // Clean up workout if no sets remain at all
+    conn.execute(
+        "DELETE FROM workouts WHERE id = ?1
+         AND NOT EXISTS (SELECT 1 FROM sets WHERE workout_id = ?1)",
+        rusqlite::params![workout_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    recompute_pr_flags(&conn, exercise_id)?;
+
+    Ok(())
 }
 
 #[derive(Serialize)]
@@ -457,7 +546,8 @@ pub fn run() {
             list_exercise_categories,
             list_exercises_in_category,
             get_exercise,
-            add_set,
+            upsert_set,
+            delete_set,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
