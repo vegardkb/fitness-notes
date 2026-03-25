@@ -36,11 +36,20 @@ This document will outline the plan for developing a fitness note taking app.
 ### Database Schema
 
 ```sql
+-- Exercise categories (e.g. "Push", "Pull", "Legs")
+CREATE TABLE categories (
+  id    INTEGER PRIMARY KEY,
+  name  TEXT NOT NULL UNIQUE
+);
+-- Default categories seeded on first run:
+-- Abs, Back, Biceps, Chest, Legs, Shoulders, Triceps
+
 -- Exercises (the movement, not a specific session)
 CREATE TABLE exercises (
-  id        INTEGER PRIMARY KEY,
-  name      TEXT NOT NULL UNIQUE,
-  category  TEXT  -- e.g. "Push", "Pull", "Legs", "Cardio"
+  id          INTEGER PRIMARY KEY,
+  name        TEXT NOT NULL UNIQUE,
+  category_id INTEGER NOT NULL,
+  FOREIGN KEY (category_id) REFERENCES categories(id)
 );
 
 -- A workout is a collection of sets performed on a single date
@@ -49,41 +58,57 @@ CREATE TABLE workouts (
   date  TEXT NOT NULL UNIQUE  -- ISO 8601 "YYYY-MM-DD"
 );
 
+-- Tracks which exercises appear in a workout and their display order
+CREATE TABLE workout_exercises (
+  id              INTEGER PRIMARY KEY,
+  workout_id      INTEGER NOT NULL,
+  exercise_id     INTEGER NOT NULL,
+  exercise_order  INTEGER NOT NULL,
+  FOREIGN KEY (workout_id) REFERENCES workouts(id),
+  FOREIGN KEY (exercise_id) REFERENCES exercises(id),
+  UNIQUE (workout_id, exercise_id)
+);
+
 -- Individual sets within a workout
 CREATE TABLE sets (
   id              INTEGER PRIMARY KEY,
-  workout_id      INTEGER NOT NULL REFERENCES workouts(id) ON DELETE CASCADE,
-  exercise_id     INTEGER NOT NULL REFERENCES exercises(id),
+  workout_id      INTEGER NOT NULL,
+  exercise_id     INTEGER NOT NULL,
   set_order       INTEGER NOT NULL,  -- ordering within a workout/exercise
-  weight_kg       REAL,              -- always stored in kg; convert to display unit in the frontend
-  reps            INTEGER,
+  weight_kg       REAL NOT NULL,     -- always stored in kg; convert to display unit in the frontend
+  reps            INTEGER NOT NULL,
   notes           TEXT,
-  was_pr_at_time  INTEGER NOT NULL DEFAULT 0,  -- 1 if this was a PR when it was logged
-  is_current_pr   INTEGER NOT NULL DEFAULT 0   -- 1 if this is still a PR today (recomputed on change)
+  was_pr_at_time  BOOLEAN NOT NULL,
+  is_current_pr   BOOLEAN NOT NULL,
+  FOREIGN KEY (workout_id) REFERENCES workouts(id),
+  FOREIGN KEY (exercise_id) REFERENCES exercises(id)
 );
 
 -- Body measurements (all optional except date)
 CREATE TABLE body_measurements (
-  id          INTEGER PRIMARY KEY,
-  date        TEXT NOT NULL UNIQUE,  -- ISO 8601 "YYYY-MM-DD"
-  weight_kg   REAL,                  -- always stored in kg
-  body_fat    REAL,    -- percentage, manually entered
-  waist_cm    REAL,
-  neck_cm     REAL,
-  -- circumferences
+  id             INTEGER PRIMARY KEY,
+  date           TEXT NOT NULL UNIQUE,  -- ISO 8601 "YYYY-MM-DD"
+  weight_kg      REAL,                  -- always stored in kg
+  body_fat       REAL,                  -- percentage, manually entered
+  waist_cm       REAL,
+  neck_cm        REAL,
   chest_cm       REAL,
+  shoulder_cm    REAL,
   hips_cm        REAL,
   left_arm_cm    REAL,
   right_arm_cm   REAL,
   left_thigh_cm  REAL,
-  right_thigh_cm REAL
+  right_thigh_cm REAL,
+  left_calf_cm   REAL,
+  right_calf_cm  REAL
 );
 
--- User settings (single row)
+-- User settings (single row, enforced by CHECK)
 CREATE TABLE user_settings (
-  id          INTEGER PRIMARY KEY CHECK (id = 1),  -- enforces single row
-  height_cm   REAL,    -- used for navy body fat formula
-  unit        TEXT NOT NULL DEFAULT 'kg'  -- 'kg' or 'lb'
+  id                  INTEGER PRIMARY KEY CHECK (id = 1),
+  height_cm           REAL,     -- used for navy body fat formula
+  unit               TEXT NOT NULL DEFAULT 'kg',  -- 'kg' or 'lb'
+  estimate_body_fat   BOOLEAN NOT NULL DEFAULT true
 );
 ```
 
@@ -125,7 +150,8 @@ Key commands to expose via `#[tauri::command]`:
 | `delete_set` | Remove a set |
 | `get_exercise_history` | All sets for an exercise, grouped by date |
 | `get_exercise_graph_data` | Time series: date → estimated 1RM / volume / max weight |
-| `list_exercises` | All exercises (for autocomplete) |
+| `list_exercise_categories` | All categories |
+| `list_exercises_in_category` | All exercises (for autocomplete) |
 | `create_exercise` | Add new exercise |
 | `get_body_log` | All body measurement entries |
 | `upsert_body_measurement` | Add or edit body measurement; computes navy BF% if applicable |
@@ -171,8 +197,9 @@ Estimated BF% (men) = `86.010 × log10(waist_cm - neck_cm) - 70.041 × log10(hei
 ### Import: FitNotes CSV Format
 
 FitNotes exports a CSV with columns: `Date, Exercise, Category, Weight (kg), Reps, Distance, Distance Unit, Time`. Import should:
-1. Create exercises if they don't exist (using `Category` to populate `category`).
-2. Find or create a workout for each date.
+1. Find or create a row in `categories` for each unique `Category` value.
+2. Find or create a row in `exercises` for each unique `Exercise` name, linked to the category.
+3. Find or create a workout for each date.
 3. Insert sets, preserving original order.
 4. Recompute PRs for all imported exercises after bulk insert.
 
