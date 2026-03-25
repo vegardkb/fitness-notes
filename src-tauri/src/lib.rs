@@ -335,6 +335,77 @@ fn reorder_sets(
 }
 
 #[tauri::command]
+fn get_workouts_for_range(
+    from_date: &str,
+    to_date: &str,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<Vec<DayWorkout>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT w.date, e.id, e.name, c.name, we.exercise_order,
+                    s.id, s.set_order, s.weight_kg, s.reps, s.notes, s.was_pr_at_time, s.is_current_pr
+             FROM workouts w
+             JOIN workout_exercises we ON we.workout_id = w.id
+             JOIN exercises e ON we.exercise_id = e.id
+             JOIN categories c ON e.category_id = c.id
+             JOIN sets s ON s.workout_id = w.id AND s.exercise_id = e.id
+             WHERE w.date BETWEEN ?1 AND ?2
+             ORDER BY w.date DESC, we.exercise_order, s.set_order",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map(rusqlite::params![from_date, to_date], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, i64>(4)?,
+                row.get::<_, i64>(5)?,
+                row.get::<_, i64>(6)?,
+                row.get::<_, f64>(7)?,
+                row.get::<_, i64>(8)?,
+                row.get::<_, Option<String>>(9)?,
+                row.get::<_, bool>(10)?,
+                row.get::<_, bool>(11)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut result: Vec<DayWorkout> = Vec::new();
+    for row in rows {
+        let (date, exercise_id, exercise_name, category, exercise_order,
+             set_id, set_order, weight_kg, reps, notes, was_pr_at_time, is_current_pr)
+            = row.map_err(|e| e.to_string())?;
+
+        let set = Set { id: set_id, set_order, weight_kg, reps, notes, was_pr_at_time, is_current_pr };
+
+        let day = match result.last_mut() {
+            Some(d) if d.date == date => d,
+            _ => {
+                result.push(DayWorkout { date: date.clone(), exercises: Vec::new() });
+                result.last_mut().unwrap()
+            }
+        };
+
+        match day.exercises.last_mut() {
+            Some(ex) if ex.exercise_id == exercise_id => ex.sets.push(set),
+            _ => day.exercises.push(ExerciseWithSets {
+                exercise_id,
+                exercise_name,
+                category,
+                exercise_order,
+                sets: vec![set],
+            }),
+        }
+    }
+
+    Ok(result)
+}
+
+#[tauri::command]
 fn get_active_dates(
     year: i32,
     month: u32,
@@ -407,6 +478,12 @@ struct ExerciseWithSets {
     pub category: String,
     pub exercise_order: i64,
     pub sets: Vec<Set>,
+}
+
+#[derive(Serialize)]
+struct DayWorkout {
+    pub date: String,
+    pub exercises: Vec<ExerciseWithSets>,
 }
 
 #[derive(Serialize)]
@@ -615,6 +692,7 @@ pub fn run() {
             get_active_dates,
             reorder_exercises,
             reorder_sets,
+            get_workouts_for_range,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

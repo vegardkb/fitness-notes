@@ -72,17 +72,21 @@ SQL migration files live in `src-tauri/migrations/` and are applied at startup. 
 
 ## Routing Structure
 
-SvelteKit file-based routes (all statically pre-rendered):
-- `/` — Calendar view
-- `/day/[date]` — Day view (YYYY-MM-DD)
-- `/exercise/[id]` — Exercise view
-- `/exercise/[id]/history` — Exercise history
-- `/exercise/[id]/graph` — Exercise graph
-- `/body` — Body tracker log
-- `/body/graph` — Body tracker graphs
-- `/import`, `/export` — Data tools
+- `/` — Feed (infinite-scroll list of day cards, newest first). `prerender = false`.
+- `/calendar` — Month calendar with workout activity dots. Navigates to `/?date=YYYY-MM-DD`.
+- `/exercise/[id]/[date]` — Sets for one exercise on one date. Back button returns to `/`.
 
-Selected date and other ephemeral UI state live in a Svelte store. Unit preference (kg/lb) and user height are stored in the `user_settings` DB table (single row), not in localStorage. Weight values are always stored in kg in the DB; the frontend converts to the display unit.
+The day view no longer exists as a standalone route — it is `src/lib/DayCard.svelte`, rendered as a card inside the feed.
+
+**Key components:**
+- `src/lib/DayCard.svelte` — renders one day's exercises as a card. Fetches its own data on mount via `get_workout_for_date`. Accepts `date: string` prop.
+- `src/lib/AddExerciseModal.svelte` — bottom-sheet modal for selecting category → exercise. Navigates to `/exercise/[id]/[date]` on selection.
+
+**Feed scroll state** persists across client-side navigations using module-level variables in `+page.svelte` (`<script module>`). Back-navigation from the exercise view restores the previous scroll position and loaded date window. Calendar navigation (`?date=`) triggers a fresh load centered on the target date.
+
+**`get_workouts_for_range(from_date, to_date)`** is the batch command for fetching workout data across a date range in one SQLite query. The feed uses individual `get_workout_for_date` calls per DayCard; `get_workouts_for_range` is available for features that need bulk data.
+
+Unit preference (kg/lb) and user height are stored in the `user_settings` DB table (single row), not in localStorage. Weight values are always stored in kg in the DB; the frontend converts to the display unit.
 
 ## PR Logic
 

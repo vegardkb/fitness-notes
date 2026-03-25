@@ -221,6 +221,7 @@ date, exercise, category, set_order, weight_kg, reps, was_pr_at_time, is_current
 - Exercise view with today's sets
 - Routing between views
 - Reorder exercises and sets by dragging
+- Surprise rewrite: Scroll through days.
 
 **Phase 3 – Exercise insights**
 - Exercise history view
@@ -237,6 +238,4 @@ date, exercise, category, set_order, weight_kg, reps, was_pr_at_time, is_current
 
 **Phase 6 – Polish**
 - Unit toggle (kg/lb)
-- Keyboard navigation
 - Explore: cumulative load metric, cross-metric correlation graphs
-- Scroll through days.
