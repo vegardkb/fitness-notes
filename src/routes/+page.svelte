@@ -1,9 +1,13 @@
-<script>
-    const date = new Date();
-    let route = "day/" + date.toISOString().split("T")[0];
-</script>
+<script lang="ts">
+    import { goto } from "$app/navigation";
 
-<main>
-    <h1>Fitness Notes!</h1>
-    <a href={route}>To current day</a>
-</main>
+    function todayStr(): string {
+        const n = new Date();
+        const y = n.getFullYear();
+        const m = String(n.getMonth() + 1).padStart(2, "0");
+        const d = String(n.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+    }
+
+    goto(`/day/${todayStr()}`, { replaceState: true });
+</script>

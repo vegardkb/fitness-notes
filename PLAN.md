@@ -224,7 +224,6 @@ date, exercise, category, set_order, weight_kg, reps, was_pr_at_time, is_current
 **Phase 3 – Exercise insights**
 - Exercise history view
 - Exercise graph (estimated 1RM over time, volume)
-- PR badges on sets
 
 **Phase 4 – Import / Export**
 - FitNotes CSV import
@@ -239,3 +238,4 @@ date, exercise, category, set_order, weight_kg, reps, was_pr_at_time, is_current
 - Unit toggle (kg/lb)
 - Keyboard navigation
 - Explore: cumulative load metric, cross-metric correlation graphs
+- Scroll through days.
