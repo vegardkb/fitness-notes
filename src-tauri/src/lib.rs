@@ -1,10 +1,28 @@
 use serde::Serialize;
 use tauri::Manager;
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            initialize_db(app)?;
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            get_active_dates,
+            get_workout_for_date,
+            upsert_set,
+            delete_set,
+            list_exercise_categories,
+            list_exercises_in_category,
+            get_exercise,
+            reorder_exercises,
+            reorder_sets,
+            get_workouts_for_range,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }
 
 #[tauri::command]
@@ -124,7 +142,10 @@ fn list_exercises_in_category(
         .map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map(rusqlite::params![category], |row| {
-            Ok(Exercise { id: row.get(0)?, name: row.get(1)? })
+            Ok(Exercise {
+                id: row.get(0)?,
+                name: row.get(1)?,
+            })
         })
         .map_err(|e| e.to_string())?;
     rows.map(|r| r.map_err(|e| e.to_string())).collect()
@@ -139,7 +160,12 @@ fn get_exercise(
     conn.query_row(
         "SELECT id, name FROM exercises WHERE id = ?1",
         rusqlite::params![id],
-        |row| Ok(Exercise { id: row.get(0)?, name: row.get(1)? }),
+        |row| {
+            Ok(Exercise {
+                id: row.get(0)?,
+                name: row.get(1)?,
+            })
+        },
     )
     .map_err(|e| e.to_string())
 }
@@ -288,7 +314,15 @@ fn upsert_set(
         )
         .map_err(|e| e.to_string())?;
 
-    Ok(Set { id: set_id, set_order, weight_kg, reps, notes, was_pr_at_time, is_current_pr })
+    Ok(Set {
+        id: set_id,
+        set_order,
+        weight_kg,
+        reps,
+        notes,
+        was_pr_at_time,
+        is_current_pr,
+    })
 }
 
 #[tauri::command]
@@ -317,7 +351,6 @@ fn reorder_exercises(
 
 #[tauri::command]
 fn reorder_sets(
-    date: &str,
     exercise_id: i64,
     ordered_set_ids: Vec<i64>,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
@@ -376,16 +409,38 @@ fn get_workouts_for_range(
 
     let mut result: Vec<DayWorkout> = Vec::new();
     for row in rows {
-        let (date, exercise_id, exercise_name, category, exercise_order,
-             set_id, set_order, weight_kg, reps, notes, was_pr_at_time, is_current_pr)
-            = row.map_err(|e| e.to_string())?;
+        let (
+            date,
+            exercise_id,
+            exercise_name,
+            category,
+            exercise_order,
+            set_id,
+            set_order,
+            weight_kg,
+            reps,
+            notes,
+            was_pr_at_time,
+            is_current_pr,
+        ) = row.map_err(|e| e.to_string())?;
 
-        let set = Set { id: set_id, set_order, weight_kg, reps, notes, was_pr_at_time, is_current_pr };
+        let set = Set {
+            id: set_id,
+            set_order,
+            weight_kg,
+            reps,
+            notes,
+            was_pr_at_time,
+            is_current_pr,
+        };
 
         let day = match result.last_mut() {
             Some(d) if d.date == date => d,
             _ => {
-                result.push(DayWorkout { date: date.clone(), exercises: Vec::new() });
+                result.push(DayWorkout {
+                    date: date.clone(),
+                    exercises: Vec::new(),
+                });
                 result.last_mut().unwrap()
             }
         };
@@ -417,9 +472,7 @@ fn get_active_dates(
         .prepare("SELECT date FROM workouts WHERE date LIKE ?1 ORDER BY date")
         .map_err(|e| e.to_string())?;
     let dates = stmt
-        .query_map(rusqlite::params![format!("{}%", prefix)], |row| {
-            row.get(0)
-        })
+        .query_map(rusqlite::params![format!("{}%", prefix)], |row| row.get(0))
         .map_err(|e| e.to_string())?
         .collect::<Result<Vec<String>, _>>()
         .map_err(|e| e.to_string())?;
@@ -584,7 +637,8 @@ fn create_tables(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::error::
              id integer primary key check (id = 1),
              height_cm integer not null,
              unit text not null default 'kg',
-             estimate_body_fat boolean not null default true
+             estimate_body_fat boolean not null default true,
+             dark_mode boolean not null default true
          )",
         (),
     )?;
@@ -671,29 +725,4 @@ fn create_tables(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::error::
              ('Diamond Push-Up',       (SELECT id FROM categories WHERE name = 'Triceps'));",
     )?;
     Ok(())
-}
-
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
-        .setup(|app| {
-            initialize_db(app)?;
-            Ok(())
-        })
-        .invoke_handler(tauri::generate_handler![
-            greet,
-            get_workout_for_date,
-            list_exercise_categories,
-            list_exercises_in_category,
-            get_exercise,
-            upsert_set,
-            delete_set,
-            get_active_dates,
-            reorder_exercises,
-            reorder_sets,
-            get_workouts_for_range,
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
 }
