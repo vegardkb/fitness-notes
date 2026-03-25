@@ -1,271 +1,329 @@
 :root {
-  --bg: #0f0f0f;
-  --surface: #1a1a1a;
-  --surface-hover: #222;
-  --border: #2a2a2a;
-  --text: #e8e8e8;
-  --text-muted: #888;
-  --accent: #4ade80;
-  --accent-dim: #22543d;
-  --danger: #f87171;
-  --radius: 8px;
-  --spacing: 1rem;
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface-hover: #222;
+    --border: #2a2a2a;
+    --text: #e8e8e8;
+    --text-muted: #888;
+    --accent: #4ade80;
+    --accent-dim: #22543d;
+    --danger: #f87171;
+    --radius: 8px;
+    --spacing: 1rem;
 }
 
 * {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
 }
 
 body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: system-ui, -apple-system, sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
-  min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family:
+        system-ui,
+        -apple-system,
+        sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    min-height: 100vh;
 }
 
 .page {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: var(--spacing);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing);
+    max-width: 600px;
+    margin: 0 auto;
+    padding: var(--spacing);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing);
 }
 
 .header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding-bottom: var(--spacing);
-  border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding-bottom: var(--spacing);
+    border-bottom: 1px solid var(--border);
 }
 
 .header h1 {
-  font-size: 1.25rem;
-  font-weight: 600;
+    font-size: 1.25rem;
+    font-weight: 600;
 }
 
 .date-nav {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: auto;
 }
 
 .date-nav-btn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 1.1rem;
-  cursor: pointer;
-  padding: 0.25rem 0.4rem;
-  border-radius: var(--radius);
-  line-height: 1;
-  transition: color 0.1s, background 0.1s;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 0.25rem 0.4rem;
+    border-radius: var(--radius);
+    line-height: 1;
+    transition:
+        color 0.1s,
+        background 0.1s;
 }
 
 .date-nav-btn:hover {
-  color: var(--text);
-  background: var(--surface-hover);
+    color: var(--text);
+    background: var(--surface-hover);
 }
 
 .date-label {
-  background: none;
-  border: none;
-  color: var(--text);
-  font-size: 1.1rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0.25rem 0.5rem;
-  border-radius: var(--radius);
-  transition: background 0.1s;
-  white-space: nowrap;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius);
+    transition: background 0.1s;
+    white-space: nowrap;
 }
 
 .date-label:hover {
-  background: var(--surface-hover);
+    background: var(--surface-hover);
 }
 
 .back-btn {
-  background: none;
-  border: none;
-  color: var(--accent);
-  font-size: 1.25rem;
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-  text-decoration: none;
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    text-decoration: none;
 }
 
 .list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 }
 
 .list-item {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.875rem var(--spacing);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  transition: background 0.1s;
-  text-align: left;
-  width: 100%;
-  color: var(--text);
-  font-size: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.875rem var(--spacing);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: background 0.1s;
+    text-align: left;
+    width: 100%;
+    color: var(--text);
+    font-size: 1rem;
 }
 
 .list-item:hover {
-  background: var(--surface-hover);
+    background: var(--surface-hover);
 }
 
 .list-item .muted {
-  color: var(--text-muted);
-  font-size: 0.875rem;
+    color: var(--text-muted);
+    font-size: 0.875rem;
 }
 
 .add-btn {
-  background: var(--accent);
-  color: #0f0f0f;
-  border: none;
-  border-radius: var(--radius);
-  padding: 0.75rem var(--spacing);
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  width: 100%;
-  transition: opacity 0.1s;
+    background: var(--accent);
+    color: #0f0f0f;
+    border: none;
+    border-radius: var(--radius);
+    padding: 0.75rem var(--spacing);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    transition: opacity 0.1s;
 }
 
 .add-btn:hover {
-  opacity: 0.9;
+    opacity: 0.9;
 }
 
 .add-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .form {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--spacing);
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--spacing);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
 }
 
 .form-row {
-  display: flex;
-  gap: 0.75rem;
+    display: flex;
+    gap: 0.75rem;
 }
 
 .field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
 }
 
 .field label {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .field input {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  font-size: 1rem;
-  padding: 0.5rem 0.75rem;
-  width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 1rem;
+    padding: 0.5rem 0.75rem;
+    width: 100%;
 }
 
 .field input:focus {
-  outline: none;
-  border-color: var(--accent);
+    outline: none;
+    border-color: var(--accent);
 }
 
 .pr-badge {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  padding: 0.15rem 0.4rem;
-  border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
 }
 
 .pr-badge--current {
-  background: var(--accent-dim);
-  color: var(--accent);
+    background: var(--accent-dim);
+    color: var(--accent);
 }
 
 .pr-badge--historic {
-  background: #2a2a2a;
-  color: var(--text-muted);
+    background: #2a2a2a;
+    color: var(--text-muted);
 }
 
 .exercise-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
 }
 
 .exercise-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem var(--spacing);
-  cursor: pointer;
-  width: 100%;
-  background: none;
-  border: none;
-  color: var(--text);
-  font-size: 1rem;
-  font-weight: 500;
-  text-align: left;
-  transition: background 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem var(--spacing);
+    cursor: pointer;
+    width: 100%;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-size: 1rem;
+    font-weight: 500;
+    text-align: left;
+    transition: background 0.1s;
 }
 
 .exercise-card-header:hover {
-  background: var(--surface-hover);
+    background: var(--surface-hover);
 }
 
 .exercise-card-sets {
-  border-top: 1px solid var(--border);
-  padding: 0.5rem var(--spacing);
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
+    border-top: 1px solid var(--border);
+    padding: 0.5rem var(--spacing);
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
 }
 
 .set-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
 }
 
 .set-row .set-label {
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  min-width: 1.5rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    min-width: 1.5rem;
+}
+
+.set-row .set-weight {
+    flex: 1;
+}
+
+.set-row .set-badge {
+    min-width: 2rem;
+    text-align: right;
 }
 
 .empty {
-  color: var(--text-muted);
-  text-align: center;
-  padding: 2rem 0;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 2rem 0;
+}
+
+.list-item--selected {
+    border-color: var(--accent);
+    background: var(--surface-hover);
+}
+
+.delete-btn {
+    background: transparent;
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius);
+    padding: 0.75rem var(--spacing);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.1s;
+}
+
+.delete-btn:hover {
+    background: rgba(248, 113, 113, 0.1);
+}
+
+.update-btn {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 0.75rem var(--spacing);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.1s;
+}
+
+.update-btn:hover {
+    background: var(--accent-dim);
+}
+
+.update-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
