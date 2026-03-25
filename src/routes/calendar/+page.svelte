@@ -75,7 +75,7 @@
                 <button
                     class="cal-day"
                     class:cal-day--today={cell.dateStr === today}
-                    onclick={() => goto(`/day/${cell.dateStr}`)}
+                    onclick={() => goto(`/?date=${cell.dateStr}`)}
                 >
                     <span>{cell.day}</span>
                     {#if activeDates.has(cell.dateStr)}

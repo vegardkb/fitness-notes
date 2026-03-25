@@ -118,7 +118,7 @@
 
 <div class="page">
     <div class="header">
-        <a class="back-btn" href="/day/{date}">←</a>
+        <a class="back-btn" href="/">←</a>
         <h1>{exerciseName}</h1>
     </div>
 
