@@ -129,7 +129,14 @@
 <main class="page" ontouchstart={handleTouchStart} ontouchend={handleTouchEnd}>
     {#if view === "exercises"}
         <div class="header">
-            <a class="back-btn" href="/">←</a>
+            <a class="back-btn" href="/calendar" aria-label="Calendar">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="4" width="16" height="14" rx="2"/>
+                    <line x1="2" y1="8" x2="18" y2="8"/>
+                    <line x1="6" y1="2" x2="6" y2="6"/>
+                    <line x1="14" y1="2" x2="14" y2="6"/>
+                </svg>
+            </a>
             <div class="date-nav">
                 <button class="date-nav-btn" onclick={() => navigateDay(-1)}
                     >‹</button

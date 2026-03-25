@@ -292,6 +292,27 @@ fn upsert_set(
 }
 
 #[tauri::command]
+fn get_active_dates(
+    year: i32,
+    month: u32,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<Vec<String>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let prefix = format!("{}-{:02}", year, month);
+    let mut stmt = conn
+        .prepare("SELECT date FROM workouts WHERE date LIKE ?1 ORDER BY date")
+        .map_err(|e| e.to_string())?;
+    let dates = stmt
+        .query_map(rusqlite::params![format!("{}%", prefix)], |row| {
+            row.get(0)
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<String>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(dates)
+}
+
+#[tauri::command]
 fn delete_set(
     id: i64,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
@@ -548,6 +569,7 @@ pub fn run() {
             get_exercise,
             upsert_set,
             delete_set,
+            get_active_dates,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
