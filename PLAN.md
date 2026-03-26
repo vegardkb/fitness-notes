@@ -242,3 +242,7 @@ date, exercise, category, set_order, weight_kg, reps, was_pr_at_time, is_current
 - Unit toggle (kg/lb)
 - Explore: cumulative load metric, cross-metric correlation graphs
 - Season best
+
+**Phase 7 - Quality of life**
+- Light mode
+- Save workout templates
