@@ -1,3 +1,5 @@
+use crate::models::{Settings, Sex, WeightUnit};
+
 pub fn create_tables(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::error::Error>> {
     conn.execute(
         "create table if not exists exercises (
@@ -54,19 +56,16 @@ pub fn create_tables(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::err
         "create table if not exists body_measurements (
              id integer primary key,
              date text not null unique,
-             weight_kg real,
-             body_fat real,
-             waist_cm real,
-             neck_cm real,
-             chest_cm real,
-             shoulder_cm real,
-             hips_cm real,
-             left_arm_cm real,
-             right_arm_cm real,
-             left_thigh_cm real,
-             right_thigh_cm real,
-             left_calf_cm real,
-             right_calf_cm real
+             value real not null,
+             measure_id integer not null,
+             foreign key (measure_id) references body_metrics(id)
+         )",
+        (),
+    )?;
+    conn.execute(
+        "create table if not exists body_metrics (
+             id integer primary key,
+             name text not null unique,
          )",
         (),
     )?;
@@ -76,7 +75,8 @@ pub fn create_tables(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::err
              height_cm integer not null,
              unit text not null default 'kg',
              estimate_body_fat boolean not null default true,
-             dark_mode boolean not null default true
+             dark_mode boolean not null default true,
+             sex text not null default 'male'
          )",
         (),
     )?;
@@ -89,6 +89,19 @@ pub fn create_tables(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::err
              ('Legs'),
              ('Shoulders'),
              ('Triceps');
+
+         INSERT OR IGNORE INTO body_metrics (name) VALUES
+             ('Weight'),
+             ('Body Fat'),
+             ('Waist'),
+             ('Hip'),
+             ('Neck'),
+             ('Chest'),
+             ('Shoulder'),
+             ('Arm'),
+             ('Thigh'),
+             ('Calf'),
+             ('FFMI');
 
          INSERT OR IGNORE INTO exercises (name, category_id) VALUES
              -- Abs
@@ -222,4 +235,35 @@ pub fn recompute_pr_flags(conn: &rusqlite::Connection, exercise_id: i64) -> Resu
     .map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+pub fn get_settings(conn: &rusqlite::Connection) -> Result<Settings, String> {
+    let mut stmt = conn
+        .prepare("SELECT us.height_cm, us.sex, us.estimate_body_fat, us.dark_mode, us.unit FROM user_settings us")
+        .map_err(|e| e.to_string())?;
+
+    let mut row = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, bool>(2)?,
+                row.get::<_, bool>(3)?,
+                row.get::<_, String>(4)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
+    let r = row.next();
+    match r {
+        Some(Ok((height, sex, estimate_body_fat, dark_mode, unit))) => Ok(Settings {
+            height,
+            sex: Sex::from(sex),
+            estimate_body_fat,
+            dark_mode,
+            unit: WeightUnit::from(unit),
+        }),
+        Some(Err(e)) => Err(e.to_string()),
+        None => Err("No settings found".to_string()),
+    }
 }

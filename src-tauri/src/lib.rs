@@ -1,3 +1,4 @@
+use crate::commands::body::upsert_body_measurement;
 use crate::commands::exercises::{
     get_exercise, get_exercise_graph_data, get_exercise_history, get_rep_maxes,
     list_exercise_categories, list_exercises_in_category,
@@ -37,6 +38,7 @@ pub fn run() {
             parse_fitnotes_csv,
             import_fitnotes_rows,
             delete_all_data,
+            upsert_body_measurement,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
