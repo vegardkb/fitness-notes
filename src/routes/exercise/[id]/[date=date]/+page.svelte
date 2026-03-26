@@ -60,7 +60,10 @@
     }
 
     async function refreshSets() {
-        const workout = await invoke<ExerciseWithSets[]>("get_workout_for_date", { date });
+        const workout = await invoke<ExerciseWithSets[]>(
+            "get_workout_for_date",
+            { date },
+        );
         sets = workout.find((e) => e.exercise_id === exerciseId)?.sets ?? [];
     }
 
@@ -109,7 +112,6 @@
     function handleSetFinalize(e: CustomEvent) {
         sets = e.detail.items;
         invoke("reorder_sets", {
-            date,
             exerciseId,
             orderedSetIds: sets.map((s) => s.id),
         }).then(() => refreshSets());
@@ -118,8 +120,29 @@
 
 <div class="page">
     <div class="header">
-        <a class="back-btn" href="/">←</a>
+        <a class="back-btn" href="/?date={date}">←</a>
         <h1>{exerciseName}</h1>
+        <div class="header-tabs">
+            <span class="header-tab header-tab--active" aria-label="Sets">
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                    <line x1="4" y1="6" x2="16" y2="6"/>
+                    <line x1="4" y1="10" x2="16" y2="10"/>
+                    <line x1="4" y1="14" x2="16" y2="14"/>
+                </svg>
+            </span>
+            <a class="header-tab" href="/exercise/{exerciseId}/history?from={date}" aria-label="History">
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="10" cy="10" r="8"/>
+                    <polyline points="10,6 10,10 13,12"/>
+                </svg>
+            </a>
+            <a class="header-tab" href="/exercise/{exerciseId}/graph?from={date}" aria-label="Graph">
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="2,15 7,9 11,12 18,4"/>
+                    <line x1="2" y1="18" x2="18" y2="18"/>
+                </svg>
+            </a>
+        </div>
     </div>
 
     {#if sets.length === 0}
@@ -139,8 +162,11 @@
                 >
                     <span class="drag-handle">≡</span>
                     <span class="set-stats">
-                        <span class="stat-val stat-val--weight">{formatWeight(set.weight_kg)}</span><span class="stat-unit">kg</span>
-                        <span class="stat-val stat-val--reps">{set.reps}</span><span class="stat-unit">reps</span>
+                        <span class="stat-val stat-val--weight"
+                            >{formatWeight(set.weight_kg)}</span
+                        ><span class="stat-unit">kg</span>
+                        <span class="stat-val stat-val--reps">{set.reps}</span
+                        ><span class="stat-unit">reps</span>
                     </span>
                     <span class="set-badge">
                         {#if set.is_current_pr}

@@ -51,6 +51,7 @@ body {
 .header h1 {
     font-size: 1.25rem;
     font-weight: 600;
+    flex: 1;
 }
 
 .date-nav {
@@ -431,6 +432,124 @@ body {
     height: 5px;
     border-radius: 50%;
     background: var(--accent);
+}
+
+/* ── History ──────────────────────────────── */
+
+.history-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding-bottom: var(--spacing);
+    border-bottom: 1px solid var(--border);
+}
+
+.history-header h1 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    flex: 1;
+}
+
+/* ── Graph ────────────────────────────────── */
+
+.graph-ranges {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.range-pill {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: 999px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.1s, border-color 0.1s, background 0.1s;
+}
+
+.range-pill:hover {
+    color: var(--text);
+    border-color: var(--text-muted);
+}
+
+.range-pill--active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+}
+
+.graph-switcher {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.graph-switcher select {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 0.875rem;
+    padding: 0.4rem 0.6rem;
+    cursor: pointer;
+    appearance: auto;
+}
+
+.graph-switcher select:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.graph-chart {
+    width: 100%;
+    overflow: visible;
+}
+
+.graph-tooltip {
+    position: fixed;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.4rem 0.65rem;
+    font-size: 0.8rem;
+    pointer-events: none;
+    z-index: 50;
+    white-space: nowrap;
+}
+
+/* ── Header tabs ──────────────────────────── */
+
+.header-tabs {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.header-tab {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    padding: 0.2rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: color 0.1s;
+}
+
+.header-tab:hover {
+    color: var(--text);
+}
+
+.header-tab--active {
+    color: var(--accent);
 }
 
 /* ── Feed ─────────────────────────────────── */
