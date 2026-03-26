@@ -1,3 +1,5 @@
+import { todayStr } from "$lib/date";
+
 export type Set = {
   id: number;
   set_order: number;
@@ -6,6 +8,12 @@ export type Set = {
   notes: string | null;
   was_pr_at_time: boolean;
   is_current_pr: boolean;
+};
+
+export type RepMax = {
+  date: string;
+  weight_kg: number;
+  reps: number;
 };
 
 export type ExerciseWithSets = {
@@ -28,4 +36,17 @@ export type DayWorkout = {
 export function formatWeight(kg: number): string {
   const f2 = kg.toFixed(2);
   return f2.endsWith("0") ? kg.toFixed(1) : f2;
+}
+
+export function exerciseHrefs(exerciseId: number, fromDate: string) {
+  const from = fromDate ? `?from=${fromDate}` : "";
+  return {
+    feedHref: fromDate ? `/?date=${fromDate}` : "/",
+    setsHref: fromDate
+      ? `/exercise/${exerciseId}/${fromDate}`
+      : `/exercise/${exerciseId}/${todayStr()}`,
+    historyHref: `/exercise/${exerciseId}/history${from}`,
+    graphHref: `/exercise/${exerciseId}/graph${from}`,
+    prsHref: `/exercise/${exerciseId}/prs${from}`,
+  };
 }
