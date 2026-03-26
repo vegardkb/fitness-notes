@@ -1,20 +1,26 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
     import { invoke } from "@tauri-apps/api/core";
+    import { todayStr } from "$lib/date";
 
     const MONTH_NAMES = [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
     ];
     const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
     function toDateStr(y: number, m: number, d: number): string {
         return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    }
-
-    function todayStr(): string {
-        const n = new Date();
-        return toDateStr(n.getFullYear(), n.getMonth() + 1, n.getDate());
     }
 
     const today = todayStr();
@@ -27,19 +33,29 @@
     $effect(() => {
         const y = year;
         const m = month;
-        invoke<string[]>("get_active_dates", { year: y, month: m }).then((dates) => {
-            activeDates = new Set(dates);
-        });
+        invoke<string[]>("get_active_dates", { year: y, month: m }).then(
+            (dates) => {
+                activeDates = new Set(dates);
+            },
+        );
     });
 
     function prevMonth() {
-        if (month === 1) { month = 12; year -= 1; }
-        else { month -= 1; }
+        if (month === 1) {
+            month = 12;
+            year -= 1;
+        } else {
+            month -= 1;
+        }
     }
 
     function nextMonth() {
-        if (month === 12) { month = 1; year += 1; }
-        else { month += 1; }
+        if (month === 12) {
+            month = 1;
+            year += 1;
+        } else {
+            month += 1;
+        }
     }
 
     const cells = $derived.by(() => {

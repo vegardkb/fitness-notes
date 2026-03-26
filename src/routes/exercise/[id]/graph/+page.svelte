@@ -3,14 +3,10 @@
     import { goto } from "$app/navigation";
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
+    import { todayStr, formatDateLong } from "$lib/date";
 
     type DataPoint = { date: string; metric: number };
     type Exercise = { id: number; name: string };
-
-    function todayStr(): string {
-        const n = new Date();
-        return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
-    }
 
     function offsetMonths(dateStr: string, months: number): string {
         const [y, m, d] = dateStr.split("-").map(Number);
@@ -23,7 +19,9 @@
 
     const feedHref = $derived(dateCtx ? `/?date=${dateCtx}` : "/");
     const setsHref = $derived(
-        dateCtx ? `/exercise/${exerciseId}/${dateCtx}` : `/exercise/${exerciseId}/${todayStr()}`,
+        dateCtx
+            ? `/exercise/${exerciseId}/${dateCtx}`
+            : `/exercise/${exerciseId}/${todayStr()}`,
     );
     const historyHref = $derived(
         dateCtx
@@ -57,12 +55,12 @@
 
     $effect(() => {
         if (!selectedCategory) return;
-        invoke<Exercise[]>("list_exercises_in_category", { category: selectedCategory }).then(
-            (exs) => {
-                categoryExercises = exs;
-                selectedExerciseId = "";
-            },
-        );
+        invoke<Exercise[]>("list_exercises_in_category", {
+            category: selectedCategory,
+        }).then((exs) => {
+            categoryExercises = exs;
+            selectedExerciseId = "";
+        });
     });
 
     $effect(() => {
@@ -70,7 +68,11 @@
         if (newId && newId !== exerciseId) {
             selectedExerciseId = "";
             const ctx = dateCtx;
-            goto(ctx ? `/exercise/${newId}/graph?from=${ctx}` : `/exercise/${newId}/graph`);
+            goto(
+                ctx
+                    ? `/exercise/${newId}/graph?from=${ctx}`
+                    : `/exercise/${newId}/graph`,
+            );
         }
     });
 
@@ -132,13 +134,18 @@
 
         return data.map((d) => ({
             x: PAD_LEFT + ((dateToMs(d.date) - minMs) / msRange) * PLOT_W,
-            y: PAD_TOP + PLOT_H - ((d.metric - minMetric) / metricRange) * PLOT_H,
+            y:
+                PAD_TOP +
+                PLOT_H -
+                ((d.metric - minMetric) / metricRange) * PLOT_H,
             date: d.date,
             metric: d.metric,
         }));
     });
 
-    const polylinePoints = $derived(chartPoints.map((p) => `${p.x},${p.y}`).join(" "));
+    const polylinePoints = $derived(
+        chartPoints.map((p) => `${p.x},${p.y}`).join(" "),
+    );
 
     // Grid lines (4 horizontal, evenly spaced in y)
     const gridLines = $derived.by(() => {
@@ -167,31 +174,31 @@
 
         return [...new Set(indices)].map((idx) => {
             const d = data[idx];
-            const x = PAD_LEFT + ((dateToMs(d.date) - minMs) / msRange) * PLOT_W;
+            const x =
+                PAD_LEFT + ((dateToMs(d.date) - minMs) / msRange) * PLOT_W;
             const [y, m, day] = d.date.split("-").map(Number);
-            const label = new Date(y, m - 1, day).toLocaleDateString(undefined, {
-                month: "short",
-                day: "numeric",
-            });
+            const label = new Date(y, m - 1, day).toLocaleDateString(
+                undefined,
+                {
+                    month: "short",
+                    day: "numeric",
+                },
+            );
             return { x, label };
         });
     });
 
     // Tooltip state
-    let tooltip = $state<{ x: number; y: number; date: string; metric: number } | null>(null);
+    let tooltip = $state<{
+        x: number;
+        y: number;
+        date: string;
+        metric: number;
+    } | null>(null);
 
     function formatWeight(kg: number): string {
         const f2 = kg.toFixed(2);
         return f2.endsWith("0") ? kg.toFixed(1) : f2;
-    }
-
-    function formatDateLong(dateStr: string): string {
-        const [y, m, d] = dateStr.split("-").map(Number);
-        return new Date(y, m - 1, d).toLocaleDateString(undefined, {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-        });
     }
 </script>
 
@@ -201,29 +208,55 @@
         <h1>{exerciseName || "…"}</h1>
         <div class="header-tabs">
             <a class="header-tab" href={setsHref} aria-label="Sets">
-                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-                    <line x1="4" y1="6" x2="16" y2="6"/>
-                    <line x1="4" y1="10" x2="16" y2="10"/>
-                    <line x1="4" y1="14" x2="16" y2="14"/>
+                <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                >
+                    <line x1="4" y1="6" x2="16" y2="6" />
+                    <line x1="4" y1="10" x2="16" y2="10" />
+                    <line x1="4" y1="14" x2="16" y2="14" />
                 </svg>
             </a>
             <a class="header-tab" href={historyHref} aria-label="History">
-                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="10" cy="10" r="8"/>
-                    <polyline points="10,6 10,10 13,12"/>
+                <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <circle cx="10" cy="10" r="8" />
+                    <polyline points="10,6 10,10 13,12" />
                 </svg>
             </a>
             <span class="header-tab header-tab--active" aria-label="Graph">
-                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="2,15 7,9 11,12 18,4"/>
-                    <line x1="2" y1="18" x2="18" y2="18"/>
+                <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <polyline points="2,15 7,9 11,12 18,4" />
+                    <line x1="2" y1="18" x2="18" y2="18" />
                 </svg>
             </span>
         </div>
     </div>
 
     <div class="graph-ranges">
-        {#each (["1M", "1Y", "3Y", "All"] as const) as r}
+        {#each ["1M", "1Y", "3Y", "All"] as const as r}
             <button
                 class="range-pill"
                 class:range-pill--active={range === r}
@@ -280,8 +313,8 @@
                     text-anchor="end"
                     fill="var(--text-muted)"
                     font-size="11"
-                    font-family="system-ui, sans-serif"
-                >{gl.label}</text>
+                    font-family="system-ui, sans-serif">{gl.label}</text
+                >
             {/each}
 
             <!-- X labels -->
@@ -292,8 +325,8 @@
                     text-anchor="middle"
                     fill="var(--text-muted)"
                     font-size="11"
-                    font-family="system-ui, sans-serif"
-                >{xl.label}</text>
+                    font-family="system-ui, sans-serif">{xl.label}</text
+                >
             {/each}
 
             <!-- Line -->

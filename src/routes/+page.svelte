@@ -9,6 +9,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import DayCard from "$lib/DayCard.svelte";
+    import { offsetDate, todayStr } from "$lib/date";
 
     let days = $state<string[]>([]);
     let loadingOlder = $state(false);
@@ -19,18 +20,6 @@
     let topSentinel: HTMLElement;
     let bottomSentinel: HTMLElement;
     let observer: IntersectionObserver | null = null;
-
-    function todayStr(): string {
-        const n = new Date();
-        return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
-    }
-
-    function offsetDate(dateStr: string, delta: number): string {
-        const [y, m, d] = dateStr.split("-").map(Number);
-        const dt = new Date(y, m - 1, d);
-        dt.setDate(dt.getDate() + delta);
-        return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
-    }
 
     function minDate(a: string, b: string): string {
         return a < b ? a : b;
@@ -63,7 +52,9 @@
     }
 
     function scrollToDate(date: string) {
-        document.getElementById(`day-${date}`)?.scrollIntoView({ behavior: "instant", block: "start" });
+        document
+            .getElementById(`day-${date}`)
+            ?.scrollIntoView({ behavior: "instant", block: "start" });
     }
 
     function setupObserver() {
@@ -75,7 +66,10 @@
 
                     if (entry.target === bottomSentinel && !loadingOlder) {
                         loadingOlder = true;
-                        loadRange(offsetDate(oldestLoaded, -14), offsetDate(oldestLoaded, -1));
+                        loadRange(
+                            offsetDate(oldestLoaded, -14),
+                            offsetDate(oldestLoaded, -1),
+                        );
                         loadingOlder = false;
                     }
 
@@ -85,17 +79,24 @@
                         loadingNewer = true;
                         const from = offsetDate(newestLoaded, 1);
                         const to = minDate(offsetDate(from, 13), today);
-                        const prevHeight = document.documentElement.scrollHeight;
+                        const prevHeight =
+                            document.documentElement.scrollHeight;
                         loadRange(from, to);
-                        await new Promise<void>((r) => requestAnimationFrame(() => {
-                            window.scrollBy(0, document.documentElement.scrollHeight - prevHeight);
-                            r();
-                        }));
+                        await new Promise<void>((r) =>
+                            requestAnimationFrame(() => {
+                                window.scrollBy(
+                                    0,
+                                    document.documentElement.scrollHeight -
+                                        prevHeight,
+                                );
+                                r();
+                            }),
+                        );
                         loadingNewer = false;
                     }
                 }
             },
-            { rootMargin: "400px" }
+            { rootMargin: "400px" },
         );
         observer.observe(topSentinel);
         observer.observe(bottomSentinel);
@@ -125,8 +126,12 @@
             });
         } else {
             // Fresh load or deep-link
-            const anchor = targetDate && isValidDate(targetDate) ? targetDate : todayStr();
-            loadRange(offsetDate(anchor, -13), minDate(offsetDate(anchor, 3), todayStr()));
+            const anchor =
+                targetDate && isValidDate(targetDate) ? targetDate : todayStr();
+            loadRange(
+                offsetDate(anchor, -13),
+                minDate(offsetDate(anchor, 3), todayStr()),
+            );
             requestAnimationFrame(() => {
                 if (targetDate) scrollToDate(targetDate);
                 setupObserver();
@@ -145,17 +150,37 @@
         <span class="app-title">Fitness Notes</span>
         <div class="app-header-icons">
             <a href="/calendar" class="back-btn" aria-label="Calendar">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="2" y="4" width="16" height="14" rx="2"/>
-                    <line x1="2" y1="8" x2="18" y2="8"/>
-                    <line x1="6" y1="2" x2="6" y2="6"/>
-                    <line x1="14" y1="2" x2="14" y2="6"/>
+                <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <rect x="2" y="4" width="16" height="14" rx="2" />
+                    <line x1="2" y1="8" x2="18" y2="8" />
+                    <line x1="6" y1="2" x2="6" y2="6" />
+                    <line x1="14" y1="2" x2="14" y2="6" />
                 </svg>
             </a>
             <a href="/settings" class="back-btn" aria-label="Settings">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="10" cy="10" r="2.5"/>
-                    <path d="M10 2v1.5M10 16.5V18M2 10h1.5M16.5 10H18M4.1 4.1l1.1 1.1M14.8 14.8l1.1 1.1M4.1 15.9l1.1-1.1M14.8 5.2l1.1-1.1"/>
+                <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <circle cx="10" cy="10" r="2.5" />
+                    <path
+                        d="M10 2v1.5M10 16.5V18M2 10h1.5M16.5 10H18M4.1 4.1l1.1 1.1M14.8 14.8l1.1 1.1M4.1 15.9l1.1-1.1M14.8 5.2l1.1-1.1"
+                    />
                 </svg>
             </a>
         </div>
