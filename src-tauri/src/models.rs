@@ -44,3 +44,41 @@ pub struct RepMax {
     pub reps: i64,
     pub weight_kg: f64,
 }
+
+pub struct Settings {
+    pub height: i64,
+    pub unit: WeightUnit,
+    pub dark_mode: bool,
+    pub estimate_body_fat: bool,
+    pub sex: Sex,
+}
+
+pub enum Sex {
+    Male,
+    Female,
+}
+
+impl From<String> for Sex {
+    fn from(s: String) -> Self {
+        match s.as_str() {
+            "male" => Self::Male,
+            "female" => Self::Female,
+            _ => Self::Male,
+        }
+    }
+}
+
+pub enum WeightUnit {
+    Kg,
+    Lbs,
+}
+
+impl From<String> for WeightUnit {
+    fn from(s: String) -> Self {
+        match s.as_str() {
+            "kg" => Self::Kg,
+            "lbs" => Self::Lbs,
+            _ => Self::Kg,
+        }
+    }
+}
