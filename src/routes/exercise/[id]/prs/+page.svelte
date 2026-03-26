@@ -56,17 +56,29 @@
         <p class="empty">No PRs for this exercise.</p>
     {:else}
         <table class="pr-table">
-            {#each repMaxesFilled as item}
-                <tr class:ghost={item.ghost}>
-                    <td class="td-reps">{item.reps}</td>
-                    <td class="td-rm">RM</td>
-                    <td class="td-weight">
-                        <span>{formatWeight(item.weight_kg)}</span>
-                        <span class="date">{item.date}</span>
-                    </td>
-                    <td class="td-kg">kg</td>
+            <thead>
+                <tr>
+                    <th class="th-rm">PRs</th>
                 </tr>
-            {/each}
+            </thead>
+            <tbody>
+                {#each repMaxesFilled as item}
+                    <tr class:ghost={item.ghost}>
+                        <td class="td-reps">{item.reps}</td>
+                        <td class="td-rm">RM</td>
+                        <td class="td-weight">
+                            <span>{formatWeight(item.weight_kg)} kg</span>
+                            <span class="date"
+                                >{new Intl.DateTimeFormat("no", {
+                                    dateStyle: "short",
+                                }).format(
+                                    new Date(item.date + "T00:00:00"),
+                                )}</span
+                            >
+                        </td>
+                    </tr>
+                {/each}
+            </tbody>
         </table>
     {/if}
 </div>
