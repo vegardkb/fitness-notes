@@ -226,6 +226,7 @@ date, exercise, category, set_order, weight_kg, reps, was_pr_at_time, is_current
 **Phase 3 – Exercise insights**
 - Exercise history view
 - Exercise graph (estimated 1RM over time, volume)
+- nRM viewer
 
 **Phase 4 – Import / Export**
 - FitNotes CSV import
@@ -235,7 +236,9 @@ date, exercise, category, set_order, weight_kg, reps, was_pr_at_time, is_current
 - Body measurement log (add/edit entries)
 - Navy formula BF% estimation
 - Body tracker graphs
+- Set height
 
 **Phase 6 – Polish**
 - Unit toggle (kg/lb)
 - Explore: cumulative load metric, cross-metric correlation graphs
+- Season best

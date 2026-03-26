@@ -206,6 +206,45 @@ pub fn get_exercise_graph_data(
     Ok(result)
 }
 
+#[tauri::command]
+pub fn get_rep_maxes(
+    exercise_id: i64,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<Vec<(String, f64, i64)>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT w.date, s.weight_kg, s.reps
+             FROM workouts w
+             JOIN workout_exercises we ON we.workout_id = w.id
+             JOIN exercises e ON we.exercise_id = e.id
+             JOIN sets s ON s.workout_id = w.id AND s.exercise_id = e.id
+             WHERE e.id = ?1 AND s.is_current_pr = 1
+             ORDER BY s.weight_kg DESC",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map(rusqlite::params![exercise_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, f64>(1)?,
+                row.get::<_, i64>(2)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut result: Vec<(String, f64, i64)> = Vec::new();
+    for row in rows {
+        let (date, weight_kg, reps) = row.map_err(|e| e.to_string())?;
+
+        result.push((date, weight_kg, reps));
+    }
+
+    Ok(result)
+}
+
 fn estimate_1rm(weight: f64, reps: i64) -> f64 {
     // Use the Brzycki formula to estimate 1RM for reps <= 10
     // Epley for reps > 10

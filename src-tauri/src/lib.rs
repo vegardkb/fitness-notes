@@ -1,6 +1,6 @@
 use crate::commands::exercises::{
-    get_exercise, get_exercise_graph_data, get_exercise_history, list_exercise_categories,
-    list_exercises_in_category,
+    get_exercise, get_exercise_graph_data, get_exercise_history, get_rep_maxes,
+    list_exercise_categories, list_exercises_in_category,
 };
 use crate::commands::import::{import_fitnotes_rows, parse_fitnotes_csv};
 use crate::commands::sets::{delete_set, reorder_exercises, reorder_sets, upsert_set};
@@ -30,6 +30,7 @@ pub fn run() {
             list_exercise_categories,
             list_exercises_in_category,
             get_exercise,
+            get_rep_maxes,
             reorder_exercises,
             reorder_sets,
             get_workouts_for_range,
