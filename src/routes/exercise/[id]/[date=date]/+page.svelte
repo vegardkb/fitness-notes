@@ -8,7 +8,7 @@
     import ExerciseHeader from "$lib/ExerciseHeader.svelte";
 
     const exerciseId = $derived(Number(page.params.id ?? "0"));
-    const date = $derived(page.url.searchParams.get("from") ?? "");
+    const date = $derived(page.params.date ?? "");
     const hrefs = $derived(exerciseHrefs(exerciseId, date));
 
     let exerciseName = $state("");

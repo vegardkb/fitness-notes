@@ -1,4 +1,4 @@
-use crate::models::{DatedValue, DayWorkout, Exercise, ExerciseWithSets, Set};
+use crate::models::{DatedValue, DayWorkout, Exercise, ExerciseWithSets, RepMax, Set};
 
 #[tauri::command]
 pub fn list_exercise_categories(
@@ -210,7 +210,7 @@ pub fn get_exercise_graph_data(
 pub fn get_rep_maxes(
     exercise_id: i64,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<Vec<(String, f64, i64)>, String> {
+) -> Result<Vec<RepMax>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
 
     let mut stmt = conn
@@ -235,11 +235,15 @@ pub fn get_rep_maxes(
         })
         .map_err(|e| e.to_string())?;
 
-    let mut result: Vec<(String, f64, i64)> = Vec::new();
+    let mut result: Vec<RepMax> = Vec::new();
     for row in rows {
         let (date, weight_kg, reps) = row.map_err(|e| e.to_string())?;
 
-        result.push((date, weight_kg, reps));
+        result.push(RepMax {
+            date,
+            reps,
+            weight_kg,
+        });
     }
 
     Ok(result)

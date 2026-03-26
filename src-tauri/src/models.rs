@@ -37,3 +37,10 @@ pub struct DatedValue {
     pub date: String,
     pub metric: f64,
 }
+
+#[derive(Serialize)]
+pub struct RepMax {
+    pub date: String,
+    pub reps: i64,
+    pub weight_kg: f64,
+}
