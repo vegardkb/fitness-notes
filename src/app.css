@@ -552,6 +552,92 @@ body {
     color: var(--accent);
 }
 
+/* ── Settings / Import ────────────────────── */
+
+.settings-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.settings-section-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    padding: 0 0 0.4rem;
+}
+
+.settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.875rem var(--spacing);
+    font-size: 1rem;
+}
+
+.import-unknown-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.import-unknown-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem var(--spacing);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.import-unknown-item.is-picking {
+    border-color: var(--accent);
+}
+
+.import-unknown-name {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.import-unknown-meta {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.import-unknown-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.import-mapped-label {
+    font-size: 0.85rem;
+    color: var(--accent);
+}
+
+.import-picker {
+    border-top: 1px solid var(--border);
+    padding-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.import-summary {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--spacing);
+    font-size: 1.05rem;
+    text-align: center;
+    line-height: 1.6;
+}
+
 /* ── Feed ─────────────────────────────────── */
 
 .app-header-wrap {
@@ -575,6 +661,12 @@ body {
 .app-title {
     font-weight: 600;
     font-size: 1rem;
+}
+
+.app-header-icons {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .feed {
