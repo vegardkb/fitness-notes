@@ -104,17 +104,27 @@
     onMount(() => {
         const targetDate = new URLSearchParams(location.search).get("date");
 
-        if (_savedDays.length > 0 && !targetDate) {
-            // Back-navigation: restore saved state and scroll position
+        if (_savedDays.length > 0) {
+            // Back-navigation: restore saved state
             days = _savedDays;
             oldestLoaded = _savedOldest;
             newestLoaded = _savedNewest;
             requestAnimationFrame(() => {
-                window.scrollTo(0, _savedScrollY);
+                if (targetDate && isValidDate(targetDate)) {
+                    if (!_savedDays.includes(targetDate)) {
+                        loadRange(
+                            offsetDate(targetDate, -3),
+                            minDate(offsetDate(targetDate, 3), todayStr()),
+                        );
+                    }
+                    scrollToDate(targetDate);
+                } else {
+                    window.scrollTo(0, _savedScrollY);
+                }
                 setTimeout(setupObserver, 150);
             });
         } else {
-            // Fresh load or calendar deep-link
+            // Fresh load or deep-link
             const anchor = targetDate && isValidDate(targetDate) ? targetDate : todayStr();
             loadRange(offsetDate(anchor, -13), minDate(offsetDate(anchor, 3), todayStr()));
             requestAnimationFrame(() => {

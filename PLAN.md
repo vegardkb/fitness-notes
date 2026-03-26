@@ -144,7 +144,7 @@ Key commands to expose via `#[tauri::command]`:
 
 | Command | Description |
 |---|---|
-| `get_workouts_with_activity` | Returns dates with workout data (for calendar) |
+| `get_active_dates` | Returns dates with workout data (for calendar) |
 | `get_workout_for_date` | Returns all exercises + sets for a date |
 | `upsert_set` | Add or edit a set; recomputes `is_current_pr` for all sets of that exercise; sets `was_pr_at_time` on new sets |
 | `delete_set` | Remove a set |
@@ -197,7 +197,7 @@ Estimated BF% (men) = `86.010 × log10(waist_cm - neck_cm) - 70.041 × log10(hei
 ### Import: FitNotes CSV Format
 
 FitNotes exports a CSV with columns: `Date, Exercise, Category, Weight (kg), Reps, Distance, Distance Unit, Time`. Import should:
-1. Find or create a row in `categories` for each unique `Category` value.
+1. Find or create a row in `categories` for each unique `Category` value. NB: This needs some more thought, should prompt the user if they want to map to an existing category-exercise or create new in the case that there are no matches.
 2. Find or create a row in `exercises` for each unique `Exercise` name, linked to the category.
 3. Find or create a workout for each date.
 3. Insert sets, preserving original order.
