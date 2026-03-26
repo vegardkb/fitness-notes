@@ -9,7 +9,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import DayCard from "$lib/DayCard.svelte";
-    import { offsetDate, todayStr } from "$lib/date";
+    import { offsetDate, todayStr, isValidDate } from "$lib/date";
 
     let days = $state<string[]>([]);
     let loadingOlder = $state(false);
@@ -23,10 +23,6 @@
 
     function minDate(a: string, b: string): string {
         return a < b ? a : b;
-    }
-
-    function isValidDate(s: string): boolean {
-        return /^\d{4}-\d{2}-\d{2}$/.test(s);
     }
 
     function datesBetween(from: string, to: string): string[] {
@@ -54,7 +50,7 @@
     function scrollToDate(date: string) {
         document
             .getElementById(`day-${date}`)
-            ?.scrollIntoView({ behavior: "instant", block: "start" });
+            ?.scrollIntoView({ behavior: "instant", block: "center" });
     }
 
     function setupObserver() {
