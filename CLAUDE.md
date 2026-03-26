@@ -2,6 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## General
+Don't edit files unless asked to. You're purpose in this project is to provide guidance on how to use new technologies and architectures, not to write lines of code.
+
 ## Commands
 
 Use `pnpm` as the package manager.

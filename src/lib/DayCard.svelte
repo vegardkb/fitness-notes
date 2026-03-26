@@ -4,6 +4,7 @@
     import { onMount } from "svelte";
     import { dndzone } from "svelte-dnd-action";
     import AddExerciseModal from "$lib/AddExerciseModal.svelte";
+    import { formatDate } from "$lib/date";
 
     type Set = {
         id: number;
@@ -28,32 +29,6 @@
 
     let exercises = $state<ExerciseWithSets[]>([]);
     let showAddModal = $state(false);
-    let dragActive = $state(false);
-
-    function todayStr(): string {
-        const n = new Date();
-        return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
-    }
-
-    function offsetDate(dateStr: string, delta: number): string {
-        const [y, m, d] = dateStr.split("-").map(Number);
-        const dt = new Date(y, m - 1, d);
-        dt.setDate(dt.getDate() + delta);
-        return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
-    }
-
-    function formatDate(dateStr: string): string {
-        const today = todayStr();
-        if (dateStr === today) return "Today";
-        if (dateStr === offsetDate(today, -1)) return "Yesterday";
-        if (dateStr === offsetDate(today, 1)) return "Tomorrow";
-        const [y, m, d] = dateStr.split("-").map(Number);
-        return new Date(y, m - 1, d).toLocaleDateString("en-US", {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-        });
-    }
 
     function formatWeight(kg: number): string {
         const f2 = kg.toFixed(2);
@@ -61,7 +36,10 @@
     }
 
     async function loadExercises() {
-        const result = await invoke<ExerciseWithSets[]>("get_workout_for_date", { date });
+        const result = await invoke<ExerciseWithSets[]>(
+            "get_workout_for_date",
+            { date },
+        );
         exercises = result.map((e) => ({ ...e, id: e.exercise_id }));
     }
 
@@ -85,7 +63,9 @@
 <article class="day-card" id="day-{date}">
     <div class="day-card-header">
         <span class="day-label">{formatDate(date)}</span>
-        <button class="add-btn-inline" onclick={() => (showAddModal = true)}>+ Add</button>
+        <button class="add-btn-inline" onclick={() => (showAddModal = true)}
+            >+ Add</button
+        >
     </div>
 
     {#if exercises.length === 0}
@@ -101,7 +81,8 @@
                 <div class="exercise-card">
                     <button
                         class="exercise-card-header"
-                        onclick={() => goto(`/exercise/${ex.exercise_id}/${date}`)}
+                        onclick={() =>
+                            goto(`/exercise/${ex.exercise_id}/${date}`)}
                     >
                         <span class="drag-handle">≡</span>
                         <span>{ex.exercise_name}</span>
@@ -112,14 +93,23 @@
                             <div class="set-row">
                                 <span class="set-label">{i + 1}</span>
                                 <span class="set-stats">
-                                    <span class="stat-val stat-val--weight">{formatWeight(set.weight_kg)}</span><span class="stat-unit">kg</span>
-                                    <span class="stat-val stat-val--reps">{set.reps}</span><span class="stat-unit">reps</span>
+                                    <span class="stat-val stat-val--weight"
+                                        >{formatWeight(set.weight_kg)}</span
+                                    ><span class="stat-unit">kg</span>
+                                    <span class="stat-val stat-val--reps"
+                                        >{set.reps}</span
+                                    ><span class="stat-unit">reps</span>
                                 </span>
                                 <span class="set-badge">
                                     {#if set.is_current_pr}
-                                        <span class="pr-badge pr-badge--current">PR</span>
+                                        <span class="pr-badge pr-badge--current"
+                                            >PR</span
+                                        >
                                     {:else if set.was_pr_at_time}
-                                        <span class="pr-badge pr-badge--historic">PR</span>
+                                        <span
+                                            class="pr-badge pr-badge--historic"
+                                            >PR</span
+                                        >
                                     {/if}
                                 </span>
                             </div>
