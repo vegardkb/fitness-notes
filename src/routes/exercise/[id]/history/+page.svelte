@@ -4,32 +4,8 @@
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
     import { todayStr, formatDate } from "$lib/date";
-
-    type Set = {
-        id: number;
-        set_order: number;
-        weight_kg: number;
-        reps: number;
-        notes: string | null;
-        was_pr_at_time: boolean;
-        is_current_pr: boolean;
-    };
-
-    type ExerciseWithSets = {
-        exercise_id: number;
-        exercise_name: string;
-        sets: Set[];
-    };
-
-    type DayWorkout = {
-        date: string;
-        exercises: ExerciseWithSets[];
-    };
-
-    type Exercise = {
-        id: number;
-        name: string;
-    };
+    import type { Exercise, DayWorkout } from "$lib/exercise";
+    import { formatWeight } from "$lib/exercise";
 
     const exerciseId = $derived(Number(page.params.id ?? "0"));
     const fromDate = $derived(page.url.searchParams.get("from") ?? "");
@@ -48,11 +24,6 @@
 
     let exerciseName = $state("");
     let history = $state<DayWorkout[]>([]);
-
-    function formatWeight(kg: number): string {
-        const f2 = kg.toFixed(2);
-        return f2.endsWith("0") ? kg.toFixed(1) : f2;
-    }
 
     onMount(async () => {
         const [historyData, exercise] = await Promise.all([

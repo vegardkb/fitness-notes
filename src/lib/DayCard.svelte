@@ -5,35 +5,13 @@
     import { dndzone } from "svelte-dnd-action";
     import AddExerciseModal from "$lib/AddExerciseModal.svelte";
     import { formatDate } from "$lib/date";
-
-    type Set = {
-        id: number;
-        set_order: number;
-        weight_kg: number;
-        reps: number;
-        notes: string | null;
-        was_pr_at_time: boolean;
-        is_current_pr: boolean;
-    };
-
-    type ExerciseWithSets = {
-        id: number; // alias of exercise_id, required by dndzone
-        exercise_id: number;
-        exercise_name: string;
-        category: string;
-        exercise_order: number;
-        sets: Set[];
-    };
+    import type { ExerciseWithSets } from "$lib/exercise";
+    import { formatWeight } from "$lib/exercise";
 
     let { date }: { date: string } = $props();
 
     let exercises = $state<ExerciseWithSets[]>([]);
     let showAddModal = $state(false);
-
-    function formatWeight(kg: number): string {
-        const f2 = kg.toFixed(2);
-        return f2.endsWith("0") ? kg.toFixed(1) : f2;
-    }
 
     async function loadExercises() {
         const result = await invoke<ExerciseWithSets[]>(
@@ -46,12 +24,10 @@
     onMount(loadExercises);
 
     function handleConsider(e: CustomEvent) {
-        dragActive = true;
         exercises = e.detail.items;
     }
 
     function handleFinalize(e: CustomEvent) {
-        dragActive = false;
         exercises = e.detail.items;
         invoke("reorder_exercises", {
             date,

@@ -3,27 +3,8 @@
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
     import { dndzone } from "svelte-dnd-action";
-
-    type Set = {
-        id: number;
-        set_order: number;
-        weight_kg: number;
-        reps: number;
-        notes: string | null;
-        was_pr_at_time: boolean;
-        is_current_pr: boolean;
-    };
-
-    type ExerciseWithSets = {
-        exercise_id: number;
-        exercise_name: string;
-        sets: Set[];
-    };
-
-    type Exercise = {
-        id: number;
-        name: string;
-    };
+    import type { Set, ExerciseWithSets, Exercise } from "$lib/exercise";
+    import { formatWeight } from "$lib/exercise";
 
     const exerciseId = $derived(Number(page.params.id ?? "0"));
     const date = $derived(page.params.date ?? "");
@@ -52,11 +33,6 @@
             weightInput = String(set.weight_kg);
             repsInput = String(set.reps);
         }
-    }
-
-    function formatWeight(kg: number): string {
-        const f2 = kg.toFixed(2);
-        return f2.endsWith("0") ? kg.toFixed(1) : f2;
     }
 
     async function refreshSets() {
@@ -124,22 +100,56 @@
         <h1>{exerciseName}</h1>
         <div class="header-tabs">
             <span class="header-tab header-tab--active" aria-label="Sets">
-                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-                    <line x1="4" y1="6" x2="16" y2="6"/>
-                    <line x1="4" y1="10" x2="16" y2="10"/>
-                    <line x1="4" y1="14" x2="16" y2="14"/>
+                <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                >
+                    <line x1="4" y1="6" x2="16" y2="6" />
+                    <line x1="4" y1="10" x2="16" y2="10" />
+                    <line x1="4" y1="14" x2="16" y2="14" />
                 </svg>
             </span>
-            <a class="header-tab" href="/exercise/{exerciseId}/history?from={date}" aria-label="History">
-                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="10" cy="10" r="8"/>
-                    <polyline points="10,6 10,10 13,12"/>
+            <a
+                class="header-tab"
+                href="/exercise/{exerciseId}/history?from={date}"
+                aria-label="History"
+            >
+                <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <circle cx="10" cy="10" r="8" />
+                    <polyline points="10,6 10,10 13,12" />
                 </svg>
             </a>
-            <a class="header-tab" href="/exercise/{exerciseId}/graph?from={date}" aria-label="Graph">
-                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="2,15 7,9 11,12 18,4"/>
-                    <line x1="2" y1="18" x2="18" y2="18"/>
+            <a
+                class="header-tab"
+                href="/exercise/{exerciseId}/graph?from={date}"
+                aria-label="Graph"
+            >
+                <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <polyline points="2,15 7,9 11,12 18,4" />
+                    <line x1="2" y1="18" x2="18" y2="18" />
                 </svg>
             </a>
         </div>

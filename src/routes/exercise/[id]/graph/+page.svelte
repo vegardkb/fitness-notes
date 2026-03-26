@@ -4,6 +4,7 @@
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
     import { todayStr, formatDateLong } from "$lib/date";
+    import { formatWeight } from "$lib/exercise";
 
     type DataPoint = { date: string; metric: number };
     type Exercise = { id: number; name: string };
@@ -195,11 +196,6 @@
         date: string;
         metric: number;
     } | null>(null);
-
-    function formatWeight(kg: number): string {
-        const f2 = kg.toFixed(2);
-        return f2.endsWith("0") ? kg.toFixed(1) : f2;
-    }
 </script>
 
 <div class="page">
