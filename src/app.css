@@ -470,7 +470,10 @@ body {
     font-size: 0.875rem;
     font-weight: 500;
     cursor: pointer;
-    transition: color 0.1s, border-color 0.1s, background 0.1s;
+    transition:
+        color 0.1s,
+        border-color 0.1s,
+        background 0.1s;
 }
 
 .range-pill:hover {
@@ -756,4 +759,37 @@ body {
     display: flex;
     flex-direction: column;
     gap: var(--spacing);
+}
+
+.td-weight .date {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--muted);
+}
+.pr-table {
+    border-collapse: collapse;
+    width: 100%;
+}
+.pr-table tr {
+    border-bottom: 1px solid var(--border);
+}
+.td-reps {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    padding-right: 0.15rem;
+}
+.td-rm {
+    padding-right: 1.5rem; /* gap between RM and weight */
+    color: var(--muted);
+}
+.td-weight {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.td-kg {
+    padding-left: 0.25rem;
+    color: var(--muted);
+}
+tr.ghost td {
+    opacity: 0.35;
 }

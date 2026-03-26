@@ -6,7 +6,7 @@
     import type { RepMax } from "$lib/exercise";
     import { formatDate } from "$lib/date";
     import ExerciseHeader from "$lib/ExerciseHeader.svelte";
-    import { exerciseHrefs } from "$lib/exercise";
+    import { exerciseHrefs, formatWeight } from "$lib/exercise";
 
     type Exercise = { id: number; name: string };
 
@@ -25,6 +25,21 @@
         exerciseName = exercise.name;
         repMaxes = repMaxesData;
     });
+    const filled = $derived(() => {
+        const byReps = new Map(repMaxes.map((r) => [r.reps, r]));
+        const n = Math.max(...repMaxes.map((r) => r.reps), 0);
+        return Array.from({ length: n }, (_, i) => {
+            const k = i + 1;
+            if (byReps.has(k)) return { ...byReps.get(k)!, ghost: false };
+            // find closest l > k
+            for (let l = k + 1; l <= n; l++) {
+                if (byReps.has(l))
+                    return { ...byReps.get(l)!, ghost: true, reps: k };
+            }
+            return { ...byReps.get(n)!, ghost: true, reps: k };
+        }).filter(Boolean);
+    });
+    let repMaxesFilled = $derived(filled());
 </script>
 
 <div class="page">
@@ -40,20 +55,18 @@
     {#if repMaxes.length === 0}
         <p class="empty">No PRs for this exercise.</p>
     {:else}
-        <div class="list">
-            {#each repMaxes as set}
-                <div class="exercise-card">
-                    <button
-                        class="exercise-card-header"
-                        onclick={() =>
-                            goto(`/exercise/${exerciseId}/${set.date}`)}
-                    >
-                        <span>{set.weight_kg}kg x {set.reps}</span>
-                        <span>{formatDate(set.date)}</span>
-                        <span class="muted">→</span>
-                    </button>
-                </div>
+        <table class="pr-table">
+            {#each repMaxesFilled as item}
+                <tr class:ghost={item.ghost}>
+                    <td class="td-reps">{item.reps}</td>
+                    <td class="td-rm">RM</td>
+                    <td class="td-weight">
+                        <span>{formatWeight(item.weight_kg)}</span>
+                        <span class="date">{item.date}</span>
+                    </td>
+                    <td class="td-kg">kg</td>
+                </tr>
             {/each}
-        </div>
+        </table>
     {/if}
 </div>
