@@ -2,8 +2,9 @@
     import { page } from "$app/state";
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
-    import { todayStr, formatDateLong } from "$lib/date";
+    import { goto } from "$app/navigation";
     import type { RepMax } from "$lib/exercise";
+    import { formatDate } from "$lib/date";
     import ExerciseHeader from "$lib/ExerciseHeader.svelte";
     import { exerciseHrefs } from "$lib/exercise";
 
@@ -36,4 +37,23 @@
         {exerciseName}
         activeTab="prs"
     />
+    {#if repMaxes.length === 0}
+        <p class="empty">No PRs for this exercise.</p>
+    {:else}
+        <div class="list">
+            {#each repMaxes as set}
+                <div class="exercise-card">
+                    <button
+                        class="exercise-card-header"
+                        onclick={() =>
+                            goto(`/exercise/${exerciseId}/${set.date}`)}
+                    >
+                        <span>{set.weight_kg}kg x {set.reps}</span>
+                        <span>{formatDate(set.date)}</span>
+                        <span class="muted">→</span>
+                    </button>
+                </div>
+            {/each}
+        </div>
+    {/if}
 </div>
