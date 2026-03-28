@@ -141,7 +141,7 @@ body {
 
 .add-btn {
     background: var(--accent);
-    color: #0f0f0f;
+    color: var(--background);
     border: none;
     border-radius: var(--radius);
     padding: 0.75rem var(--spacing);
@@ -715,6 +715,23 @@ body {
 .day-label {
     font-size: 1.05rem;
     font-weight: 600;
+}
+
+.measure-btn-inline {
+    background: none;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    border-radius: var(--radius);
+    padding: 0.25rem 0.6rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.1s;
+    white-space: nowrap;
+}
+
+.measure-btn-inline:hover {
+    background: var(--accent-dim);
 }
 
 .add-btn-inline {

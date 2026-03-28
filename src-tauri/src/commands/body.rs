@@ -1,4 +1,4 @@
-use crate::models::Sex;
+use crate::models::{Measurement, Sex};
 use rusqlite::OptionalExtension;
 use std::collections::HashMap;
 
@@ -64,6 +64,46 @@ pub fn upsert_body_measurement(
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn get_measurements_for_date(
+    date: &str,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<Vec<Measurement>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT bm.name, b.value, bm.unit
+             FROM body_measurements b
+             JOIN body_metrics bm ON b.measure_id = bm.id
+             WHERE w.date = ?1",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map(rusqlite::params![date], |row| {
+            Ok((
+                row.get::<_, String>(0)?, // metric name
+                row.get::<_, f64>(1)?,    // value
+                row.get::<_, String>(2)?, // unit of measurement
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut result: Vec<Measurement> = Vec::new();
+    for row in rows {
+        let (metric, value, unit) = row.map_err(|e| e.to_string())?;
+
+        result.push(Measurement {
+            metric,
+            value,
+            unit,
+        });
+    }
+
+    Ok(result)
 }
 
 fn recompute_body_fat(

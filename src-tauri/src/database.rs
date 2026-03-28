@@ -65,7 +65,8 @@ pub fn create_tables(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::err
     conn.execute(
         "create table if not exists body_metrics (
              id integer primary key,
-             name text not null unique
+             name text not null unique,
+             unit text not null
          )",
         (),
     )?;
@@ -90,18 +91,18 @@ pub fn create_tables(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::err
              ('Shoulders'),
              ('Triceps');
 
-         INSERT OR IGNORE INTO body_metrics (name) VALUES
-             ('Weight'),
-             ('Body Fat'),
-             ('Waist'),
-             ('Hip'),
-             ('Neck'),
-             ('Chest'),
-             ('Shoulder'),
-             ('Arm'),
-             ('Thigh'),
-             ('Calf'),
-             ('FFMI');
+         INSERT OR IGNORE INTO body_metrics (name, unit) VALUES
+             ('Weight',     'kg'),
+             ('Body Fat',   '%'),
+             ('Waist',      'cm'),
+             ('Hip',        'cm'),
+             ('Neck',       'cm'),
+             ('Chest',      'cm'),
+             ('Shoulder',   'cm'),
+             ('Arm',        'cm'),
+             ('Thigh',      'cm'),
+             ('Calf',       'cm'),
+             ('FFMI',       'kg/cm^2');
 
          INSERT OR IGNORE INTO exercises (name, category_id) VALUES
              -- Abs
