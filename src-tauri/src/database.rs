@@ -65,7 +65,7 @@ pub fn create_tables(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::err
     conn.execute(
         "create table if not exists body_metrics (
              id integer primary key,
-             name text not null unique,
+             name text not null unique
          )",
         (),
     )?;
