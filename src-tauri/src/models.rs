@@ -53,6 +53,13 @@ pub struct Settings {
     pub sex: Sex,
 }
 
+#[derive(Serialize)]
+pub struct Measurement {
+    pub metric: String,
+    pub value: f64,
+    pub unit: String,
+}
+
 pub enum Sex {
     Male,
     Female,
