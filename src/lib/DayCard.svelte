@@ -54,7 +54,7 @@
         <div class="day-card-btns">
             <button
                 class="measure-btn-inline"
-                onclick={() => (showMeasureModal = true)}>+ Body</button
+                onclick={() => goto(`/body/${date}`)}>+ Body</button
             >
             <button class="add-btn-inline" onclick={() => (showAddModal = true)}
                 >+ Add</button

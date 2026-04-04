@@ -7,7 +7,7 @@
     import { formatWeight, exerciseHrefs } from "$lib/exercise";
     import ExerciseHeader from "$lib/ExerciseHeader.svelte";
 
-    type DataPoint = { date: string; metric: number };
+    type DataPoint = { date: string; value: number };
     type Exercise = { id: number; name: string };
 
     function offsetMonths(dateStr: string, months: number): string {
@@ -119,8 +119,8 @@
         const minMs = dateToMs(data[0].date);
         const maxMs = dateToMs(data.at(-1)!.date);
         const msRange = maxMs - minMs || 1;
-        const minMetric = Math.min(...data.map((d) => d.metric));
-        const maxMetric = Math.max(...data.map((d) => d.metric));
+        const minMetric = Math.min(...data.map((d) => d.value));
+        const maxMetric = Math.max(...data.map((d) => d.value));
         const metricRange = maxMetric - minMetric || 1;
 
         return data.map((d) => ({
@@ -128,9 +128,9 @@
             y:
                 PAD_TOP +
                 PLOT_H -
-                ((d.metric - minMetric) / metricRange) * PLOT_H,
+                ((d.value - minMetric) / metricRange) * PLOT_H,
             date: d.date,
-            metric: d.metric,
+            metric: d.value,
         }));
     });
 
@@ -141,8 +141,8 @@
     // Grid lines (4 horizontal, evenly spaced in y)
     const gridLines = $derived.by(() => {
         if (data.length === 0) return [];
-        const minMetric = Math.min(...data.map((d) => d.metric));
-        const maxMetric = Math.max(...data.map((d) => d.metric));
+        const minMetric = Math.min(...data.map((d) => d.value));
+        const maxMetric = Math.max(...data.map((d) => d.value));
         const metricRange = maxMetric - minMetric || 1;
         return [0, 1, 2, 3].map((i) => {
             const frac = i / 3;
