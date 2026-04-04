@@ -810,3 +810,101 @@ body {
 tr.ghost td {
     opacity: 0.35;
 }
+
+/* Body Measurements */
+.body-grid {
+    display: flex;
+    flex-direction: column;
+}
+.body-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
+    transition: opacity 0.15s;
+}
+.body-row--unsaved {
+    opacity: 0.4;
+}
+
+.body-value {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+.body-value input {
+    width: 6ch;
+    text-align: right;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 1rem;
+    padding: 0.3rem 0.4rem;
+    /* hide the spinner arrows */
+    -webkit-appearance: none;
+    -moz-appearance: textfield;
+}
+.body-value input::-webkit-outer-spin-button,
+.body-value input::-webkit-inner-spin-button {
+    display: none;
+}
+.body-unit {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    min-width: 2ch;
+}
+.save-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--border);
+    transition: color 0.15s;
+}
+
+.save-btn svg circle {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    transition:
+        fill 0.15s,
+        stroke 0.15s;
+}
+
+.save-btn--saved {
+    color: var(--accent);
+}
+
+.save-btn--saved svg circle {
+    fill: currentColor;
+    stroke: currentColor;
+}
+
+.save-btn:hover:not(.save-btn--saved) {
+    color: var(--text-muted);
+}
+.body-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: 50%;
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.body-btn:hover {
+    color: var(--text);
+    border-color: var(--text-muted);
+}

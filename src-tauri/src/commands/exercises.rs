@@ -200,7 +200,7 @@ pub fn get_exercise_graph_data(
     }
     let mut result: Vec<DatedValue> = day_max
         .into_iter()
-        .map(|(date, metric)| DatedValue { date, metric })
+        .map(|(date, value)| DatedValue { date, value })
         .collect();
     result.sort_by(|a, b| a.date.cmp(&b.date));
     Ok(result)

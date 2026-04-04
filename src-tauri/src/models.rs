@@ -35,7 +35,7 @@ pub struct Set {
 #[derive(Serialize)]
 pub struct DatedValue {
     pub date: String,
-    pub metric: f64,
+    pub value: f64,
 }
 
 #[derive(Serialize)]
@@ -53,11 +53,19 @@ pub struct Settings {
     pub sex: Sex,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct Measurement {
-    pub metric: String,
+    pub metric: Metric,
     pub value: f64,
+    pub date: String,
+    pub id: i64,
+}
+
+#[derive(Serialize, Debug)]
+pub struct Metric {
+    pub name: String,
     pub unit: String,
+    pub id: i64,
 }
 
 pub enum Sex {

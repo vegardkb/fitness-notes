@@ -55,7 +55,7 @@ pub fn create_tables(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::err
     conn.execute(
         "create table if not exists body_measurements (
              id integer primary key,
-             date text not null unique,
+             date text not null,
              value real not null,
              measure_id integer not null,
              foreign key (measure_id) references body_metrics(id)
@@ -73,7 +73,7 @@ pub fn create_tables(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::err
     conn.execute(
         "create table if not exists user_settings (
              id integer primary key check (id = 1),
-             height_cm integer not null,
+             height_cm integer not null default 178,
              unit text not null default 'kg',
              estimate_body_fat boolean not null default true,
              dark_mode boolean not null default true,
@@ -91,6 +91,10 @@ pub fn create_tables(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::err
              ('Shoulders'),
              ('Triceps');
 
+        INSERT OR IGNORE INTO user_settings (id, height_cm, unit, estimate_body_fat, dark_mode, sex)
+        VALUES (1, 178, 'kg', true, true, 'male');
+
+
          INSERT OR IGNORE INTO body_metrics (name, unit) VALUES
              ('Weight',     'kg'),
              ('Body Fat',   '%'),
@@ -102,7 +106,9 @@ pub fn create_tables(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::err
              ('Arm',        'cm'),
              ('Thigh',      'cm'),
              ('Calf',       'cm'),
-             ('FFMI',       'kg/cm^2');
+             ('FFMI',       'kg/m^2');
+
+        UPDATE body_metrics SET unit = 'kg/m^2' WHERE name = 'FFMI';
 
          INSERT OR IGNORE INTO exercises (name, category_id) VALUES
              -- Abs
