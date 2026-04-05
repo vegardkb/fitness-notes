@@ -106,16 +106,18 @@
                             class="body-btn"
                             onclick={() => incDec(row, -0.1)}>-</button
                         >
-                        <input
-                            type="number"
-                            bind:value={row.value}
-                            onblur={() => save(row)}
-                        />
+                        <div class="field">
+                            <input
+                                type="number"
+                                bind:value={row.value}
+                                onblur={() => save(row)}
+                            />
+                        </div>
                         <button
                             class="body-btn"
                             onclick={() => incDec(row, 0.1)}>+</button
-                        ></td
-                    >
+                        >
+                    </td>
                     <td>
                         <button
                             class="save-btn"
