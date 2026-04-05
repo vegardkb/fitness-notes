@@ -13,16 +13,16 @@
 
     let exerciseName = $state("");
     let sets = $state<Set[]>([]);
-    let weightInput = $state("");
-    let repsInput = $state("");
+    let weightInput: number = $state("");
+    let repsInput: number = $state("");
     let adding = $state(false);
     let set_selected = $state<Set | null>(null);
 
     function defaultToLastSet(setList: Set[]) {
         const last = setList.at(-1);
         if (last) {
-            weightInput = String(last.weight_kg);
-            repsInput = String(last.reps);
+            weightInput = last.weight_kg;
+            repsInput = last.reps;
         }
     }
 
@@ -32,8 +32,8 @@
             defaultToLastSet(sets);
         } else {
             set_selected = set;
-            weightInput = String(set.weight_kg);
-            repsInput = String(set.reps);
+            weightInput = set.weight_kg;
+            repsInput = set.reps;
         }
     }
 
@@ -63,8 +63,8 @@
                 id: set_selected?.id ?? null,
                 date,
                 exerciseId,
-                weightKg: parseFloat(weightInput),
-                reps: parseInt(repsInput),
+                weightKg: weightInput,
+                reps: repsInput,
                 notes: null,
             });
             set_selected = null;
@@ -147,24 +147,29 @@
         <div class="form-row">
             <div class="field">
                 <label for="weight">Weight (kg)</label>
-                <input
-                    id="weight"
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    placeholder="100"
-                    bind:value={weightInput}
-                />
+                <div class="body-value">
+                    <button
+                        class="body-btn"
+                        onclick={() => (weightInput -= 2.5)}>-</button
+                    >
+                    <input type="number" bind:value={weightInput} />
+                    <button
+                        class="body-btn"
+                        onclick={() => (weightInput += 2.5)}>+</button
+                    >
+                </div>
             </div>
             <div class="field">
                 <label for="reps">Reps</label>
-                <input
-                    id="reps"
-                    type="number"
-                    min="1"
-                    placeholder="5"
-                    bind:value={repsInput}
-                />
+                <div class="body-value">
+                    <button class="body-btn" onclick={() => (repsInput -= 1)}
+                        >-</button
+                    >
+                    <input type="number" bind:value={repsInput} />
+                    <button class="body-btn" onclick={() => (repsInput += 1)}
+                        >+</button
+                    >
+                </div>
             </div>
         </div>
         {#if set_selected}
