@@ -10,7 +10,6 @@
     const date = $derived(page.params.date ?? "");
     const hrefs = $derived(bodyHrefs(date));
 
-    let exerciseName = $state("");
     let measurements = $state<Measurement[]>([]);
     let measurementsFilled = $state<Measurement[]>([]);
     let metrics = $state<Metric[]>([]);
@@ -52,7 +51,7 @@
     }
 
     async function incDec(row: Measurement, delta: number) {
-        row.value = round(row.value + delta);
+        row.value = round(Math.max(row.value + delta, 0));
         save(row);
     }
 
