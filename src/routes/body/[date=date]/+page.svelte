@@ -2,14 +2,13 @@
     import { page } from "$app/state";
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
-    import { dndzone } from "svelte-dnd-action";
-    import { formatWeight, exerciseHrefs } from "$lib/exercise";
+    import { bodyHrefs } from "$lib/body";
+
     import BodyHeader from "$lib/BodyHeader.svelte";
     import type { Measurement, Metric } from "$lib/body";
 
-    const exerciseId = $derived(Number(page.params.id ?? "0"));
     const date = $derived(page.params.date ?? "");
-    const hrefs = $derived(exerciseHrefs(exerciseId, date));
+    const hrefs = $derived(bodyHrefs(date));
 
     let exerciseName = $state("");
     let measurements = $state<Measurement[]>([]);
@@ -82,12 +81,12 @@
 <div class="page">
     <BodyHeader
         feedHref={hrefs.feedHref}
-        setsHref={hrefs.setsHref}
+        logHref={hrefs.logHref}
         historyHref={hrefs.historyHref}
         graphHref={hrefs.graphHref}
         prsHref={hrefs.prsHref}
-        {exerciseName}
-        activeTab="sets"
+        activeTab="log"
+        {date}
     />
 
     <table class="body-grid">

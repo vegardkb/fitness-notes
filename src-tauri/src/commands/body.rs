@@ -1,4 +1,4 @@
-use crate::models::{Measurement, Metric, Sex};
+use crate::models::{DayMeasurement, Measurement, Metric, Sex};
 use rusqlite::OptionalExtension;
 use std::collections::HashMap;
 
@@ -158,6 +158,79 @@ pub fn get_last_measurements_for_date(
     }
 
     dbg!(&result);
+
+    Ok(result)
+}
+
+#[tauri::command]
+pub fn get_measurement_history(
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<Vec<DayMeasurement>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+
+    let mut stmt = match conn
+        .prepare(
+            "SELECT bm.name, b.value, bm.unit, bm.id, b.id, b.date
+             FROM body_measurements b
+             JOIN body_metrics bm ON b.measure_id = bm.id
+             ORDER BY b.date DESC, bm.name",
+        )
+        .map_err(|e| e.to_string())
+    {
+        Ok(stmt) => stmt,
+        Err(e) => {
+            dbg!(&e);
+            return Err(e);
+        }
+    };
+
+    let rows = match stmt
+        .query_map(rusqlite::params![], |row| {
+            Ok((
+                row.get::<_, String>(0)?, // metric name
+                row.get::<_, f64>(1)?,    // value
+                row.get::<_, String>(2)?, // unit of measurement
+                row.get::<_, i64>(3)?,    // metric id
+                row.get::<_, i64>(4)?,    // body measurement id
+                row.get::<_, String>(5)?, // date
+            ))
+        })
+        .map_err(|e| e.to_string())
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            dbg!(&e);
+            return Err(e);
+        }
+    };
+
+    let mut result: Vec<DayMeasurement> = Vec::new();
+    for row in rows {
+        let (metric_name, value, unit, metric_id, id, date) = row.map_err(|e| e.to_string())?;
+        let metric = Metric {
+            name: metric_name,
+            unit,
+            id: metric_id,
+        };
+        let measurement = Measurement {
+            metric,
+            value,
+            date: date.clone(),
+            id,
+        };
+
+        let day = match result.last_mut() {
+            Some(d) if d.date == date => d,
+            _ => {
+                result.push(DayMeasurement {
+                    date: date.clone(),
+                    measurements: Vec::new(),
+                });
+                result.last_mut().unwrap()
+            }
+        };
+        day.measurements.push(measurement);
+    }
 
     Ok(result)
 }

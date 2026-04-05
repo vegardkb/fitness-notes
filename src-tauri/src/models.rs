@@ -53,6 +53,12 @@ pub struct Settings {
     pub sex: Sex,
 }
 
+#[derive(Serialize)]
+pub struct DayMeasurement {
+    pub date: String,
+    pub measurements: Vec<Measurement>,
+}
+
 #[derive(Serialize, Debug)]
 pub struct Measurement {
     pub metric: Metric,
