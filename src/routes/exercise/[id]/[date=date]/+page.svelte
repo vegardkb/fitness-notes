@@ -105,6 +105,7 @@
         prsHref={hrefs.prsHref}
         {exerciseName}
         activeTab="sets"
+        {date}
     />
 
     {#if sets.length === 0}

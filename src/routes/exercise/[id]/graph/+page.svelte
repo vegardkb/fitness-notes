@@ -197,6 +197,7 @@
         prsHref={hrefs.prsHref}
         {exerciseName}
         activeTab="graph"
+        {date}
     />
     <div class="graph-ranges">
         {#each ["1M", "1Y", "3Y", "All"] as const as r}

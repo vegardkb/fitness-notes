@@ -16,10 +16,12 @@ export function formatDate(dateStr: string): string {
   if (dateStr === offsetDate(today, -1)) return "Yesterday";
   if (dateStr === offsetDate(today, 1)) return "Tomorrow";
   const [y, m, d] = dateStr.split("-").map(Number);
+  const [y2, m2, d2] = today.split("-").map(Number);
+  const isSameYear = y === y2;
   return new Date(y, m - 1, d).toLocaleDateString("en-US", {
-    weekday: "long",
     month: "long",
     day: "numeric",
+    ...(isSameYear ? { weekday: "long" } : { year: "numeric" }),
   });
 }
 

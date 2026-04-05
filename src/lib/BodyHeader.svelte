@@ -1,16 +1,30 @@
 <script lang="ts">
+    import { formatDate } from "$lib/date";
+
     let props = $props();
 </script>
 
 <div class="history-header">
     <a class="back-btn" href={props.feedHref}>←</a>
-    <h1>Body {props.date}</h1>
+    {#if props.activeTab === "log"}
+        <h1>Body</h1>
+        <p>{formatDate(props.date)}</p>
+    {:else if props.activeTab === "history"}
+        <h1>Body</h1>
+        <p>History</p>
+    {:else if props.activeTab === "graph"}
+        <h1>Body</h1>
+        <p>Graph</p>
+    {:else}
+        <h1>Body</h1>
+        <p></p>
+    {/if}
     <div class="header-tabs">
         <a
             class="header-tab"
-            class:header-tab--active={props.activeTab === "sets"}
-            href={props.setsHref}
-            aria-label="Sets"
+            class:header-tab--active={props.activeTab === "log"}
+            href={props.logHref}
+            aria-label="Log"
         >
             <svg
                 width="18"
