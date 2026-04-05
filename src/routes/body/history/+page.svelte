@@ -5,7 +5,6 @@
     import { onMount } from "svelte";
     import { formatDate } from "$lib/date";
     import type { DayMeasurement } from "$lib/body";
-    import { formatWeight } from "$lib/exercise";
     import BodyHeader from "$lib/BodyHeader.svelte";
     import { bodyHrefs } from "$lib/body";
 

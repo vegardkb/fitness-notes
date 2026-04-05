@@ -13,8 +13,8 @@
 
     let exerciseName = $state("");
     let sets = $state<Set[]>([]);
-    let weightInput: number = $state("");
-    let repsInput: number = $state("");
+    let weightInput: number = $state(NaN);
+    let repsInput: number = $state(NaN);
     let adding = $state(false);
     let set_selected = $state<Set | null>(null);
 
@@ -150,7 +150,9 @@
                 <div class="body-value">
                     <button
                         class="body-btn"
-                        onclick={() => (weightInput -= 2.5)}>-</button
+                        onclick={() =>
+                            (weightInput = Math.max(weightInput - 2.5, 0))}
+                        >-</button
                     >
                     <input type="number" bind:value={weightInput} />
                     <button
@@ -162,7 +164,9 @@
             <div class="field">
                 <label for="reps">Reps</label>
                 <div class="body-value">
-                    <button class="body-btn" onclick={() => (repsInput -= 1)}
+                    <button
+                        class="body-btn"
+                        onclick={() => (repsInput = Math.max(repsInput - 1, 0))}
                         >-</button
                     >
                     <input type="number" bind:value={repsInput} />
