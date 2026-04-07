@@ -1,6 +1,26 @@
 use crate::models::{Settings, Sex, WeightUnit};
 
-pub fn create_tables(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::error::Error>> {
+const SCHEMA_VERSION: u32 = 1;
+
+pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), String> {
+    let current = conn
+        .query_row("PRAGMA user_version", [], |r| r.get::<_, u32>(0))
+        .map_err(|e| e.to_string())?;
+
+    if current > SCHEMA_VERSION {
+        return Err("DB is newer than this version of the app".into());
+    }
+
+    if current < 1 && 1 <= SCHEMA_VERSION {
+        migrate_1(conn).map_err(|e| e.to_string())?;
+        conn.execute_batch("PRAGMA user_version = 1")
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+fn migrate_1(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::error::Error>> {
     conn.execute(
         "create table if not exists exercises (
              id integer primary key,

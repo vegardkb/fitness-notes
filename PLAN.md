@@ -34,23 +34,17 @@ user_settings       -- single row: height_cm, unit, dark_mode, estimate_body_fat
 
 ## Remaining features
 
-### 0. Migration infrastructure *(prerequisite for features 3 & 4)*
+### 0. Migration infrastructure ✓
 
-The current schema uses `CREATE TABLE IF NOT EXISTS`, which works for adding new tables but cannot modify existing ones. To add columns to `sets` or `user_settings`, we need a migration system.
+Implemented in `src-tauri/src/database.rs`. `SCHEMA_VERSION` is a `const u32` at the top of the file. `run_migrations` reads `PRAGMA user_version`, returns an error if the DB is ahead of the code (downgrade guard), and runs each numbered `migrate_N` function under the condition `current < N && N <= SCHEMA_VERSION`. Version is bumped immediately after each migration succeeds. Current version: **1** (full initial schema).
 
-**How it works**: SQLite has a built-in integer stored in the DB file header called `user_version` (starts at 0). We use it to track which schema changes have already been applied. At startup: read `PRAGMA user_version`, run any numbered migrations with a higher version, update the version after each one.
-
+Pending migrations to add as features land:
 ```
-Migration 1 (→ v1): current schema — all existing CREATE TABLE IF NOT EXISTS statements
-Migration 2 (→ v2): ALTER TABLE user_settings ADD COLUMN season_start TEXT DEFAULT '01-01'
-Migration 3 (→ v3): ALTER TABLE user_settings ADD COLUMN use_seasons BOOLEAN DEFAULT true
-Migration 4 (→ v4): ALTER TABLE sets ADD COLUMN is_season_pr BOOLEAN DEFAULT false
-Migration 5 (→ v5): CREATE TABLE templates / template_exercises
+v2: ALTER TABLE user_settings ADD COLUMN season_start TEXT DEFAULT '01-01'
+v3: ALTER TABLE user_settings ADD COLUMN use_seasons BOOLEAN DEFAULT true
+v4: ALTER TABLE sets ADD COLUMN is_season_pr BOOLEAN DEFAULT false
+v5: CREATE TABLE templates / template_exercises
 ```
-
-A fresh install runs all migrations in order — same end result as the current `create_tables()`. An existing install picks up from where it left off.
-
-**Files**: `src-tauri/src/database.rs` — replace `create_tables()` with `run_migrations()`
 
 ---
 
@@ -276,7 +270,7 @@ New Rust commands:
 
 ## Implementation order
 
-1. **Migration infrastructure** — unblocks schema-changing features
+1. ~~**Migration infrastructure**~~ ✓ done
 2. **WAL mode + automatic backups** — low effort, high safety value; do before any real data is stored
 3. **Create and manage exercises** — needed to use the app without a FitNotes import
 4. **Body measurements import** — needed to bring in historical data before going mobile

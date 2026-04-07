@@ -68,7 +68,7 @@ fn initialize_db(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     std::fs::create_dir_all(&app_data_dir)?;
     let conn = rusqlite::Connection::open(app_data_dir.join("fitness_notes.db"))?;
 
-    database::create_tables(&conn)?;
+    database::run_migrations(&conn)?;
     app.manage(std::sync::Mutex::new(conn));
     Ok(())
 }
