@@ -35,7 +35,7 @@ pub struct Set {
 #[derive(Serialize)]
 pub struct DatedValue {
     pub date: String,
-    pub metric: f64,
+    pub value: f64,
 }
 
 #[derive(Serialize)]
@@ -43,4 +43,63 @@ pub struct RepMax {
     pub date: String,
     pub reps: i64,
     pub weight_kg: f64,
+}
+
+pub struct Settings {
+    pub height: i64,
+    pub unit: WeightUnit,
+    pub dark_mode: bool,
+    pub estimate_body_fat: bool,
+    pub sex: Sex,
+}
+
+#[derive(Serialize)]
+pub struct DayMeasurement {
+    pub date: String,
+    pub measurements: Vec<Measurement>,
+}
+
+#[derive(Serialize, Debug)]
+pub struct Measurement {
+    pub metric: Metric,
+    pub value: f64,
+    pub date: String,
+    pub id: i64,
+}
+
+#[derive(Serialize, Debug)]
+pub struct Metric {
+    pub name: String,
+    pub unit: String,
+    pub id: i64,
+}
+
+pub enum Sex {
+    Male,
+    Female,
+}
+
+impl From<String> for Sex {
+    fn from(s: String) -> Self {
+        match s.as_str() {
+            "male" => Self::Male,
+            "female" => Self::Female,
+            _ => Self::Male,
+        }
+    }
+}
+
+pub enum WeightUnit {
+    Kg,
+    Lbs,
+}
+
+impl From<String> for WeightUnit {
+    fn from(s: String) -> Self {
+        match s.as_str() {
+            "kg" => Self::Kg,
+            "lbs" => Self::Lbs,
+            _ => Self::Kg,
+        }
+    }
 }

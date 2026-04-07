@@ -51,6 +51,7 @@
         prsHref={hrefs.prsHref}
         {exerciseName}
         activeTab="prs"
+        {date}
     />
     {#if repMaxes.length === 0}
         <p class="empty">No PRs for this exercise.</p>

@@ -7,11 +7,14 @@
     import { formatDate } from "$lib/date";
     import type { ExerciseWithSets } from "$lib/exercise";
     import { formatWeight } from "$lib/exercise";
+    import type { Measurement } from "$lib/body";
 
     let { date }: { date: string } = $props();
 
     let exercises = $state<ExerciseWithSets[]>([]);
+    let measurements = $state<Measurement[]>([]);
     let showAddModal = $state(false);
+    let showMeasureModal = $state(false);
 
     async function loadExercises() {
         const result = await invoke<ExerciseWithSets[]>(
@@ -21,7 +24,16 @@
         exercises = result.map((e) => ({ ...e, id: e.exercise_id }));
     }
 
+    async function loadMeasurements() {
+        const result = await invoke<Measurement[]>(
+            "get_measurements_for_date",
+            { date },
+        );
+        measurements = result;
+    }
+
     onMount(loadExercises);
+    onMount(loadMeasurements);
 
     function handleConsider(e: CustomEvent) {
         exercises = e.detail.items;
@@ -39,9 +51,15 @@
 <article class="day-card" id="day-{date}">
     <div class="day-card-header">
         <span class="day-label">{formatDate(date)}</span>
-        <button class="add-btn-inline" onclick={() => (showAddModal = true)}
-            >+ Add</button
-        >
+        <div class="day-card-btns">
+            <button
+                class="measure-btn-inline"
+                onclick={() => goto(`/body/${date}`)}>+ Body</button
+            >
+            <button class="add-btn-inline" onclick={() => (showAddModal = true)}
+                >+ Add</button
+            >
+        </div>
     </div>
 
     {#if exercises.length === 0}

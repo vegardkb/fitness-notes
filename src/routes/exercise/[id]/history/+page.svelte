@@ -34,6 +34,7 @@
         prsHref={hrefs.prsHref}
         {exerciseName}
         activeTab="history"
+        {date}
     />
 
     {#if history.length === 0}
