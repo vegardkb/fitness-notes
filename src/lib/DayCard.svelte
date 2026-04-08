@@ -6,11 +6,12 @@
     import { formatDate } from "$lib/date";
     import type { ExerciseWithSets } from "$lib/exercise";
     import { formatWeight } from "$lib/exercise";
-    import type { Measurement } from "$lib/body";
 
     let { date }: { date: string } = $props();
 
     let exercises = $state<ExerciseWithSets[]>([]);
+
+    let dragDisabled = $state(true);
 
     async function loadExercises() {
         const result = await invoke<ExerciseWithSets[]>(
@@ -22,17 +23,23 @@
 
     onMount(loadExercises);
 
-    function handleConsider(e: CustomEvent) {
-        exercises = e.detail.items;
-    }
-
-    function handleFinalize(e: CustomEvent) {
-        exercises = e.detail.items;
+    const handleConsider = (evt) => {
+        exercises = evt.detail.items;
+    };
+    const handleFinalize = (evt) => {
+        exercises = evt.detail.items;
         invoke("reorder_exercises", {
             date,
             orderedExerciseIds: exercises.map((ex) => ex.exercise_id),
         });
-    }
+        dragDisabled = true;
+    };
+    const startDrag = () => {
+        dragDisabled = false;
+    };
+    const stopDrag = () => {
+        dragDisabled = true;
+    };
 </script>
 
 <article class="day-card" id="day-{date}">
@@ -55,7 +62,11 @@
     {:else}
         <div
             class="list"
-            use:dndzone={{ items: exercises, flipDurationMs: 150 }}
+            use:dndzone={{
+                items: exercises,
+                flipDurationMs: 150,
+                dragDisabled,
+            }}
             onconsider={handleConsider}
             onfinalize={handleFinalize}
         >
@@ -66,7 +77,13 @@
                         onclick={() =>
                             goto(`/exercise/${ex.exercise_id}/${date}`)}
                     >
-                        <span class="drag-handle">≡</span>
+                        <span
+                            class="drag-handle"
+                            role="button"
+                            tabindex="0"
+                            aria-label="Drag to reorder"
+                            onpointerdown={startDrag}>≡</span
+                        >
                         <span>{ex.exercise_name}</span>
                         <span class="muted">→</span>
                     </button>

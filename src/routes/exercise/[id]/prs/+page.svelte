@@ -2,28 +2,15 @@
     import { page } from "$app/state";
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
-    import { goto } from "$app/navigation";
     import type { RepMax } from "$lib/exercise";
-    import { formatDate } from "$lib/date";
-    import ExerciseHeader from "$lib/ExerciseHeader.svelte";
-    import { exerciseHrefs, formatWeight } from "$lib/exercise";
-
-    type Exercise = { id: number; name: string };
+    import { formatWeight } from "$lib/exercise";
 
     const exerciseId = $derived(Number(page.params.id ?? "0"));
-    const date = $derived(page.url.searchParams.get("from") ?? "");
-    const hrefs = $derived(exerciseHrefs(exerciseId, date));
 
-    let exerciseName = $state("");
     let repMaxes = $state<RepMax[]>([]);
 
     onMount(async () => {
-        const [repMaxesData, exercise] = await Promise.all([
-            invoke<RepMax[]>("get_rep_maxes", { exerciseId }),
-            invoke<Exercise>("get_exercise", { id: exerciseId }),
-        ]);
-        exerciseName = exercise.name;
-        repMaxes = repMaxesData;
+        repMaxes = await invoke<RepMax[]>("get_rep_maxes", { exerciseId });
     });
     const filled = $derived(() => {
         const byReps = new Map(repMaxes.map((r) => [r.reps, r]));
@@ -42,17 +29,7 @@
     let repMaxesFilled = $derived(filled());
 </script>
 
-<div class="page">
-    <ExerciseHeader
-        feedHref={hrefs.feedHref}
-        setsHref={hrefs.setsHref}
-        historyHref={hrefs.historyHref}
-        graphHref={hrefs.graphHref}
-        prsHref={hrefs.prsHref}
-        {exerciseName}
-        activeTab="prs"
-        {date}
-    />
+<div class="body">
     {#if repMaxes.length === 0}
         <p class="empty">No PRs for this exercise.</p>
     {:else}

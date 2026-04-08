@@ -1,5 +1,7 @@
 use crate::database::recompute_pr_flags;
-use crate::models::{Category, DatedValue, DayWorkout, Exercise, ExerciseWithSets, RepMax, Set};
+use crate::models::{
+    Category, DatedValue, DayWorkout, Exercise, ExerciseWithSets, RepMax, Set, SetMinimal,
+};
 
 #[tauri::command]
 pub fn list_exercise_categories(
@@ -452,6 +454,34 @@ pub fn get_rep_maxes(
     }
 
     Ok(result)
+}
+
+#[tauri::command]
+pub fn get_last_set(
+    exercise_id: i64,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<SetMinimal, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT s.weight_kg, s.reps FROM sets s
+             JOIN workouts w ON w.id = s.workout_id
+             WHERE s.exercise_id = ?1
+             ORDER BY w.date DESC, s.set_order DESC
+             LIMIT 1",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let row = stmt
+        .query_row(rusqlite::params![exercise_id], |row| {
+            Ok((row.get::<_, f64>(0)?, row.get::<_, i64>(1)?))
+        })
+        .map_err(|e| e.to_string())?;
+
+    let (weight, reps) = row;
+
+    Ok(SetMinimal { weight, reps })
 }
 
 fn estimate_1rm(weight: f64, reps: i64) -> f64 {

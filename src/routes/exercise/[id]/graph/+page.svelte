@@ -4,8 +4,7 @@
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
     import { todayStr, formatDateLong } from "$lib/date";
-    import { formatWeight, exerciseHrefs, type Category } from "$lib/exercise";
-    import ExerciseHeader from "$lib/ExerciseHeader.svelte";
+    import { formatWeight, type Category } from "$lib/exercise";
 
     type DataPoint = { date: string; value: number };
     type Exercise = { id: number; name: string };
@@ -18,7 +17,6 @@
 
     const exerciseId = $derived(Number(page.params.id ?? "0"));
     const date = $derived(page.url.searchParams.get("from") ?? "");
-    const hrefs = $derived(exerciseHrefs(exerciseId, date));
 
     let exerciseName = $state("");
     let data = $state<DataPoint[]>([]);
@@ -26,7 +24,7 @@
 
     // Date range
     type Range = "1M" | "1Y" | "3Y" | "All";
-    let range = $state<Range>("1Y");
+    let range = $state<Range>("1M");
 
     const fromDate = $derived.by(() => {
         const today = todayStr();
@@ -188,17 +186,7 @@
     } | null>(null);
 </script>
 
-<div class="page">
-    <ExerciseHeader
-        feedHref={hrefs.feedHref}
-        setsHref={hrefs.setsHref}
-        historyHref={hrefs.historyHref}
-        graphHref={hrefs.graphHref}
-        prsHref={hrefs.prsHref}
-        {exerciseName}
-        activeTab="graph"
-        {date}
-    />
+<div class="body">
     <div class="graph-ranges">
         {#each ["1M", "1Y", "3Y", "All"] as const as r}
             <button

@@ -10,6 +10,11 @@ export type Set = {
   is_current_pr: boolean;
 };
 
+export type SetMinimal = {
+  weight: number;
+  reps: number;
+};
+
 export type RepMax = {
   date: string;
   weight_kg: number;

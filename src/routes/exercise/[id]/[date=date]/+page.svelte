@@ -3,35 +3,33 @@
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
     import { dndzone } from "svelte-dnd-action";
-    import type { Set, ExerciseWithSets, Exercise } from "$lib/exercise";
-    import { formatWeight, exerciseHrefs } from "$lib/exercise";
-    import ExerciseHeader from "$lib/ExerciseHeader.svelte";
+    import type { Set, ExerciseWithSets, SetMinimal } from "$lib/exercise";
+    import { formatWeight } from "$lib/exercise";
 
     const exerciseId = $derived(Number(page.params.id ?? "0"));
     const date = $derived(page.params.date ?? "");
-    const hrefs = $derived(exerciseHrefs(exerciseId, date));
 
-    let exerciseName = $state("");
     let sets = $state<Set[]>([]);
     let weightInput: number = $state(NaN);
     let repsInput: number = $state(NaN);
     let adding = $state(false);
     let set_selected = $state<Set | null>(null);
+    let lastSet: SetMinimal | null = $state(null);
 
-    function defaultToLastSet(setList: Set[]) {
-        const last = setList.at(-1);
-        if (last) {
-            weightInput = last.weight_kg;
-            repsInput = last.reps;
+    function defaultToLastSet() {
+        if (lastSet) {
+            weightInput = lastSet.weight;
+            repsInput = lastSet.reps;
         }
     }
 
     function selectSet(set: Set) {
         if (set_selected?.id === set.id) {
             set_selected = null;
-            defaultToLastSet(sets);
+            defaultToLastSet();
         } else {
             set_selected = set;
+            lastSet = { weight: weightInput, reps: repsInput };
             weightInput = set.weight_kg;
             repsInput = set.reps;
         }
@@ -46,13 +44,14 @@
     }
 
     onMount(async () => {
-        const [workout, exercise] = await Promise.all([
+        const [workout, lastSetData] = await Promise.all([
             invoke<ExerciseWithSets[]>("get_workout_for_date", { date }),
-            invoke<Exercise>("get_exercise", { id: exerciseId }),
+            invoke<SetMinimal>("get_last_set", { exerciseId }),
         ]);
-        exerciseName = exercise.name;
+
+        lastSet = lastSetData;
         sets = workout.find((e) => e.exercise_id === exerciseId)?.sets ?? [];
-        defaultToLastSet(sets);
+        defaultToLastSet();
     });
 
     async function addSet() {
@@ -69,7 +68,7 @@
             });
             set_selected = null;
             await refreshSets();
-            defaultToLastSet(sets);
+            defaultToLastSet();
         } finally {
             adding = false;
         }
@@ -80,7 +79,7 @@
         await invoke("delete_set", { id: set_selected.id });
         set_selected = null;
         await refreshSets();
-        defaultToLastSet(sets);
+        defaultToLastSet();
     }
 
     function handleSetConsider(e: CustomEvent) {
@@ -96,18 +95,7 @@
     }
 </script>
 
-<div class="page">
-    <ExerciseHeader
-        feedHref={hrefs.feedHref}
-        setsHref={hrefs.setsHref}
-        historyHref={hrefs.historyHref}
-        graphHref={hrefs.graphHref}
-        prsHref={hrefs.prsHref}
-        {exerciseName}
-        activeTab="sets"
-        {date}
-    />
-
+<div class="body">
     {#if sets.length === 0}
         <p class="empty">No sets yet. Add your first set below.</p>
     {:else}

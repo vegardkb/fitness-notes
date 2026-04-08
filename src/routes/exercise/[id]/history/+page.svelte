@@ -3,40 +3,22 @@
     import { goto } from "$app/navigation";
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
-    import { todayStr, formatDate } from "$lib/date";
-    import type { Exercise, DayWorkout } from "$lib/exercise";
-    import { formatWeight, exerciseHrefs } from "$lib/exercise";
-    import ExerciseHeader from "$lib/ExerciseHeader.svelte";
+    import { formatDate } from "$lib/date";
+    import type { DayWorkout } from "$lib/exercise";
+    import { formatWeight } from "$lib/exercise";
 
     const exerciseId = $derived(Number(page.params.id ?? "0"));
-    const date = $derived(page.url.searchParams.get("from") ?? "");
-    const hrefs = $derived(exerciseHrefs(exerciseId, date));
 
-    let exerciseName = $state("");
     let history = $state<DayWorkout[]>([]);
 
     onMount(async () => {
-        const [historyData, exercise] = await Promise.all([
-            invoke<DayWorkout[]>("get_exercise_history", { exerciseId }),
-            invoke<Exercise>("get_exercise", { id: exerciseId }),
-        ]);
-        exerciseName = exercise.name;
-        history = historyData;
+        history = await invoke<DayWorkout[]>("get_exercise_history", {
+            exerciseId,
+        });
     });
 </script>
 
-<div class="page">
-    <ExerciseHeader
-        feedHref={hrefs.feedHref}
-        setsHref={hrefs.setsHref}
-        historyHref={hrefs.historyHref}
-        graphHref={hrefs.graphHref}
-        prsHref={hrefs.prsHref}
-        {exerciseName}
-        activeTab="history"
-        {date}
-    />
-
+<div class="body">
     {#if history.length === 0}
         <p class="empty">No sessions logged yet.</p>
     {:else}

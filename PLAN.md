@@ -130,6 +130,11 @@ Tauri 2 has first-class Android support. The app logic (Svelte frontend + Rust b
 
 - *DnD triggers on full card body instead of handle only*: `svelte-dnd-action` initiates drag on any `pointerdown` within the zone. Fix: set `dragDisabled={isDragDisabled}` on the dndzone (default `true`), then set it `false` only on `pointerdown` of the `≡` handle element and back to `true` in the `onfinalize` handler. This restricts drag initiation to the handle. The drag handle (`≡`) is already rendered in `DayCard.svelte`.
 
+- *Weights and reps not pre-filled for first set of the day*: Consider adding a get_last_set(exercise_id) command, if data is shared across all the exercise/[id]/* routes, the get_last_set command is not needed (just get the last/first set that is fetched).
+- *Navigation with the exercise header is not smooth*: Things that should not need to reload are reloading, like the header. This is not really noticable on my macbook with m3, but is noticable on my old android phone, where things are noticably disappearing, moving around and appearing during refresh, giving a janky feel. 
+- *Slow loading on history and graph view*: Slow is an exageration, but on exercises with a lot of sets and on a slow device it is noticable. Could maybe consider fetching last month of data first and display and then fetch the rest. (defaulting to 1month for the graph). Also considering caching the fetched data for an exercise, though this will likely require a rewrite of the data structures.
+
+
 
 **iOS** (lower priority): Similar process — requires a Mac with Xcode, an Apple Developer account for device testing, and `pnpm tauri ios init`. Defer until Android is working.
 

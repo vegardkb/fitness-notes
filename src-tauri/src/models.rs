@@ -39,6 +39,12 @@ pub struct Set {
 }
 
 #[derive(Serialize)]
+pub struct SetMinimal {
+    pub weight: f64,
+    pub reps: i64,
+}
+
+#[derive(Serialize)]
 pub struct DatedValue {
     pub date: String,
     pub value: f64,
