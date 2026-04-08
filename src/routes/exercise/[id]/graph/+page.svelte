@@ -4,7 +4,7 @@
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
     import { todayStr, formatDateLong } from "$lib/date";
-    import { formatWeight, exerciseHrefs } from "$lib/exercise";
+    import { formatWeight, exerciseHrefs, type Category } from "$lib/exercise";
     import ExerciseHeader from "$lib/ExerciseHeader.svelte";
 
     type DataPoint = { date: string; value: number };
@@ -39,25 +39,25 @@
     const toDate = $derived(todayStr());
 
     // Exercise switcher
-    let categories = $state<string[]>([]);
-    let selectedCategory = $state("");
+    let categories = $state<Category[]>([]);
+    let selectedCategory = $state<Category | undefined>(undefined);
     let categoryExercises = $state<Exercise[]>([]);
-    let selectedExerciseId = $state("");
+    let selectedExercise = $state<Exercise | undefined>(undefined);
 
     $effect(() => {
         if (!selectedCategory) return;
         invoke<Exercise[]>("list_exercises_in_category", {
-            category: selectedCategory,
+            categoryId: selectedCategory.id,
         }).then((exs) => {
             categoryExercises = exs;
-            selectedExerciseId = "";
+            selectedExercise = undefined;
         });
     });
 
     $effect(() => {
-        const newId = Number(selectedExerciseId);
+        const newId = selectedExercise?.id;
         if (newId && newId !== exerciseId) {
-            selectedExerciseId = "";
+            selectedExercise = undefined;
             const ctx = date;
             goto(
                 ctx
@@ -95,7 +95,7 @@
     });
 
     onMount(async () => {
-        categories = await invoke<string[]>("list_exercise_categories");
+        categories = await invoke<Category[]>("list_exercise_categories");
     });
 
     // ── Chart geometry ────────────────────────────────────────────────────────
@@ -215,11 +215,11 @@
         <select bind:value={selectedCategory} aria-label="Category">
             <option value="">Category…</option>
             {#each categories as cat}
-                <option value={cat}>{cat}</option>
+                <option value={cat.id}>{cat.name}</option>
             {/each}
         </select>
         <select
-            bind:value={selectedExerciseId}
+            bind:value={selectedExercise}
             disabled={categoryExercises.length === 0}
             aria-label="Exercise"
         >

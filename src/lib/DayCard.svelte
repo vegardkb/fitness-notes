@@ -3,7 +3,6 @@
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
     import { dndzone } from "svelte-dnd-action";
-    import AddExerciseModal from "$lib/AddExerciseModal.svelte";
     import { formatDate } from "$lib/date";
     import type { ExerciseWithSets } from "$lib/exercise";
     import { formatWeight } from "$lib/exercise";
@@ -12,9 +11,6 @@
     let { date }: { date: string } = $props();
 
     let exercises = $state<ExerciseWithSets[]>([]);
-    let measurements = $state<Measurement[]>([]);
-    let showAddModal = $state(false);
-    let showMeasureModal = $state(false);
 
     async function loadExercises() {
         const result = await invoke<ExerciseWithSets[]>(
@@ -24,16 +20,7 @@
         exercises = result.map((e) => ({ ...e, id: e.exercise_id }));
     }
 
-    async function loadMeasurements() {
-        const result = await invoke<Measurement[]>(
-            "get_measurements_for_date",
-            { date },
-        );
-        measurements = result;
-    }
-
     onMount(loadExercises);
-    onMount(loadMeasurements);
 
     function handleConsider(e: CustomEvent) {
         exercises = e.detail.items;
@@ -56,8 +43,9 @@
                 class="measure-btn-inline"
                 onclick={() => goto(`/body/${date}`)}>+ Body</button
             >
-            <button class="add-btn-inline" onclick={() => (showAddModal = true)}
-                >+ Add</button
+            <button
+                class="add-btn-inline"
+                onclick={() => goto(`/exercises/${date}`)}>+ Add</button
             >
         </div>
     </div>
@@ -114,7 +102,3 @@
         </div>
     {/if}
 </article>
-
-{#if showAddModal}
-    <AddExerciseModal {date} onclose={() => (showAddModal = false)} />
-{/if}

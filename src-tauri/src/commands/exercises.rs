@@ -1,19 +1,25 @@
-use crate::models::{DatedValue, DayWorkout, Exercise, ExerciseWithSets, RepMax, Set};
+use crate::database::recompute_pr_flags;
+use crate::models::{Category, DatedValue, DayWorkout, Exercise, ExerciseWithSets, RepMax, Set};
 
 #[tauri::command]
 pub fn list_exercise_categories(
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<Category>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare("SELECT name FROM categories")
+        .prepare("SELECT name, id FROM categories")
         .map_err(|e| e.to_string())?;
 
     let rows = stmt
-        .query_map(rusqlite::params![], |row| row.get::<_, String>(0))
+        .query_map(rusqlite::params![], |row| {
+            Ok(Category {
+                name: row.get(0)?,
+                id: row.get(1)?,
+            })
+        })
         .map_err(|e| e.to_string())?;
 
-    let mut result: Vec<String> = Vec::new();
+    let mut result: Vec<Category> = Vec::new();
     for row in rows {
         result.push(row.map_err(|e| e.to_string())?);
     }
@@ -23,20 +29,19 @@ pub fn list_exercise_categories(
 
 #[tauri::command]
 pub fn list_exercises_in_category(
-    category: &str,
+    category_id: i64,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<Vec<Exercise>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
             "SELECT e.id, e.name FROM exercises e
-             JOIN categories c ON e.category_id = c.id
-             WHERE c.name = ?1
+             WHERE e.category_id = ?1
              ORDER BY e.name",
         )
         .map_err(|e| e.to_string())?;
     let rows = stmt
-        .query_map(rusqlite::params![category], |row| {
+        .query_map(rusqlite::params![category_id], |row| {
             Ok(Exercise {
                 id: row.get(0)?,
                 name: row.get(1)?,
@@ -44,6 +49,206 @@ pub fn list_exercises_in_category(
         })
         .map_err(|e| e.to_string())?;
     rows.map(|r| r.map_err(|e| e.to_string())).collect()
+}
+
+#[tauri::command]
+pub fn create_exercise(
+    name: &str,
+    category_id: i64,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<i64, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO exercises (name, category_id) VALUES (?1, ?2)",
+        rusqlite::params![name, category_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(conn.last_insert_rowid())
+}
+
+#[tauri::command]
+pub fn delete_exercise(
+    id: i64,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let set_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM sets WHERE exercise_id = ?1",
+            rusqlite::params![id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if set_count > 0 {
+        return Err("Cannot delete exercise with existing sets".to_string());
+    }
+    conn.execute("DELETE FROM exercises WHERE id = ?1", rusqlite::params![id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn rename_exercise(
+    id: i64,
+    name: &str,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let exercise_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM exercises WHERE id = ?1",
+            rusqlite::params![id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if exercise_count == 0 {
+        return Err("Exercise not found".to_string());
+    }
+
+    let target_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM exercises WHERE name = ?1",
+            rusqlite::params![name],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if target_count > 0 {
+        return Err("An exercise named X already exists — merge Y into X?".to_string());
+    }
+
+    conn.execute(
+        "UPDATE exercises SET name = ?1 WHERE id = ?2",
+        rusqlite::params![name, id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn create_category(
+    name: &str,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<i64, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO categories (name) VALUES (?1)",
+        rusqlite::params![name],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(conn.last_insert_rowid())
+}
+
+#[tauri::command]
+pub fn rename_category(
+    id: i64,
+    name: &str,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let category_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM categories WHERE id = ?1",
+            rusqlite::params![id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if category_count == 0 {
+        return Err("Category not found".to_string());
+    }
+    conn.execute(
+        "UPDATE categories SET name = ?1 WHERE id = ?2",
+        rusqlite::params![name, id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_category(
+    id: i64,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let set_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM sets s
+             JOIN exercises e ON s.exercise_id = e.id
+             WHERE e.category_id = ?1",
+            rusqlite::params![id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if set_count > 0 {
+        return Err("Cannot delete category with existing sets".to_string());
+    }
+    let exercise_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM exercises WHERE category_id = ?1",
+            rusqlite::params![id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if exercise_count > 0 {
+        return Err("Cannot delete category with existing exercises".to_string());
+    }
+    conn.execute(
+        "DELETE FROM categories WHERE id = ?1",
+        rusqlite::params![id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn merge_exercise_into_existing(
+    from_id: i64,
+    to_name: String,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<(), String> {
+    let mut conn = db.lock().map_err(|e| e.to_string())?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+    let to_id: i64 = tx
+        .query_row(
+            "SELECT id FROM exercises WHERE name = ?1",
+            rusqlite::params![to_name],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+
+    tx.execute(
+        "DELETE FROM workout_exercises
+         WHERE exercise_id = ?1
+           AND workout_id IN (
+             SELECT workout_id FROM workout_exercises WHERE exercise_id = ?2
+           )",
+        rusqlite::params![from_id, to_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    tx.execute(
+        "UPDATE workout_exercises SET exercise_id = ?1 WHERE exercise_id = ?2",
+        rusqlite::params![to_id, from_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    tx.execute(
+        "UPDATE sets SET exercise_id = ?1 WHERE exercise_id = ?2",
+        rusqlite::params![to_id, from_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    tx.execute(
+        "DELETE FROM exercises WHERE id = ?1",
+        rusqlite::params![from_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    tx.commit().map_err(|e| e.to_string())?;
+
+    recompute_pr_flags(&conn, to_id).map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 #[tauri::command]

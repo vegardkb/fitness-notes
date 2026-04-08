@@ -23,6 +23,11 @@ export type ExerciseWithSets = {
   sets: Set[];
 };
 
+export type Category = {
+  id: number;
+  name: string;
+};
+
 export type Exercise = {
   id: number;
   name: string;

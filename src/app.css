@@ -26,8 +26,8 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+    -webkit-tap-highlight-color: transparent;
 }
-
 body {
     background: var(--bg);
     color: var(--text);
@@ -47,6 +47,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: var(--spacing);
+    padding-top: calc(var(--spacing) + env(safe-area-inset-top, 0px));
 }
 
 .header {

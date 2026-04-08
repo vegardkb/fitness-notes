@@ -7,6 +7,12 @@ pub struct Exercise {
 }
 
 #[derive(Serialize)]
+pub struct Category {
+    pub name: String,
+    pub id: i64,
+}
+
+#[derive(Serialize)]
 pub struct ExerciseWithSets {
     pub exercise_id: i64,
     pub exercise_name: String,

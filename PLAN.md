@@ -50,17 +50,29 @@ v5: CREATE TABLE templates / template_exercises
 
 ### 1. Create and manage exercises
 
-Currently exercises can only enter the DB via the FitNotes import. There is no `create_exercise` command and no UI for adding exercises manually. This is required before using the app without importing data.
+Currently exercises can only enter the DB via the FitNotes import. There is no UI for adding exercises manually. This is required before using the app without importing data.
 
-**Commands**:
-- `create_exercise(name, category) → Exercise` — creates category if it doesn't exist; returns error if name already taken
-- `delete_exercise(id)` — only allowed if no sets exist for this exercise (guard in Rust)
-- `rename_exercise(id, name)` — for correcting typos
-- `list_exercise_categories()` already exists
+**Commands** (all implemented):
+- `create_exercise(name, category_id) → i64`
+- `delete_exercise(id)` — blocked if sets exist for this exercise
+- `rename_exercise(id, name)` — blocked if name already taken (UNIQUE constraint); returns "Exercise not found" if id invalid
+- `create_category(name) → i64`
+- `delete_category(id)` — blocked if exercises or sets exist in the category
+- `rename_category(id, name)` — blocked if name already taken; returns "Category not found" if id invalid
+- `merge_exercise_into_existing(from_id, to_name)` — re-points all sets and workout_exercises from `from` to `to`, handles the unique constraint on `(workout_id, exercise_id)` by deleting the `from` row where `to` already appears on the same day, deletes `from`, then calls `recompute_pr_flags(to_id)`
+
+**Rename conflict behavior**: both `exercises.name` and `categories.name` have UNIQUE constraints in the DB. A rename to a duplicate name returns a SQLite UNIQUE constraint error as an `Err(String)`. The frontend catches this and offers the user Merge / Cancel (exercises only; categories cannot be merged).
 
 **Frontend**:
-- In `AddExerciseModal.svelte`: add a "New exercise" option at the bottom of the exercise list within a category. Tapping it shows a text input inline, submits on enter/confirm.
-- Optionally: a "Manage exercises" route (`/exercises`) for renaming and deleting — lower priority, can be deferred until after Android.
+- Replace `AddExerciseModal.svelte` with a new route `src/routes/exercises/[date=date]/+page.svelte`
+- The "+Add exercise" button on the feed navigates to `/exercises/[date]` instead of opening the modal; delete `AddExerciseModal.svelte`
+- The page has the same category → exercise drill-down as the old modal
+- Header of each view has a "+ New" button (create category / create exercise in current category)
+- Each list item has a ⋯ menu with Rename and Delete actions
+- Rename: inline text input replacing the item; on UNIQUE error show "An exercise named X already exists — merge Y into X?" with Merge / Cancel
+- Delete: confirmation prompt; shows a blocking error if the item has sets (exercise) or exercises/sets (category)
+- Tapping an exercise item (outside the ⋯ menu) navigates to `/exercise/[id]/[date]` using `replaceState` so the browser history goes feed → exercise, skipping the exercises browser
+- The exercise page's back button already goes to `/?date=[date]` (the feed) — no change needed there
 
 ---
 
@@ -109,6 +121,15 @@ Tauri 2 has first-class Android support. The app logic (Svelte frontend + Rust b
 - `src-tauri/tauri.conf.json` — may need `android` section for permissions (storage, etc.)
 - `src-tauri/Cargo.toml` — verify mobile-compatible plugin versions
 - CSS — audit touch target sizes
+
+**Known issues to fix**:
+
+- *Transitions feel sudden*: No press feedback or page animations on mobile. Two parts:
+  1. Press feedback — add `:active` CSS states to buttons and list items (e.g. `transform: scale(0.97)` with a short `transition`). Remove the default `-webkit-tap-highlight-color` globally (already done).
+  2. Page transitions — use the View Transitions API via SvelteKit's `onNavigate` hook in `+layout.svelte`. Wrap `document.startViewTransition()` around the navigation completion; define `::view-transition-old/new(root)` animations in `app.css` for a subtle slide-fade (~150ms). The API is supported in the Chromium WebView version Tauri uses on modern Android; guard with `if (!document.startViewTransition) return` for safety.
+
+- *DnD triggers on full card body instead of handle only*: `svelte-dnd-action` initiates drag on any `pointerdown` within the zone. Fix: set `dragDisabled={isDragDisabled}` on the dndzone (default `true`), then set it `false` only on `pointerdown` of the `≡` handle element and back to `true` in the `onfinalize` handler. This restricts drag initiation to the handle. The drag handle (`≡`) is already rendered in `DayCard.svelte`.
+
 
 **iOS** (lower priority): Similar process — requires a Mac with Xcode, an Apple Developer account for device testing, and `pnpm tauri ios init`. Defer until Android is working.
 
@@ -271,7 +292,7 @@ New Rust commands:
 ## Implementation order
 
 1. ~~**Migration infrastructure**~~ ✓ done
-2. **WAL mode + automatic backups** — low effort, high safety value; do before any real data is stored
+2. ~~**WAL mode + automatic backups**~~ ✓ done
 3. **Create and manage exercises** — needed to use the app without a FitNotes import
 4. **Body measurements import** — needed to bring in historical data before going mobile
 5. **Android build** — get the app on device; do UI/touch fixes as needed
