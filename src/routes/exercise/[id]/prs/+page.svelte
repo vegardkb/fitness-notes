@@ -1,5 +1,6 @@
 <script lang="ts">
     import { page } from "$app/state";
+    import { goto } from "$app/navigation";
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
     import type { RepMax } from "$lib/exercise";
@@ -45,14 +46,16 @@
                         <td class="td-reps">{item.reps}</td>
                         <td class="td-rm">RM</td>
                         <td class="td-weight">
-                            <span>{formatWeight(item.weight_kg)} kg</span>
-                            <span class="date"
-                                >{new Intl.DateTimeFormat("no", {
-                                    dateStyle: "short",
-                                }).format(
-                                    new Date(item.date + "T00:00:00"),
-                                )}</span
-                            >
+                            <a href={`/exercise/${exerciseId}/${item.date}`}>
+                                <span>{formatWeight(item.weight_kg)} kg</span>
+                                <span class="date"
+                                    >{new Intl.DateTimeFormat("no", {
+                                        dateStyle: "short",
+                                    }).format(
+                                        new Date(item.date + "T00:00:00"),
+                                    )}</span
+                                >
+                            </a>
                         </td>
                     </tr>
                 {/each}

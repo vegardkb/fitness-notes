@@ -50,13 +50,14 @@ body {
     display: flex;
     flex-direction: column;
     gap: var(--spacing);
-    padding-top: calc(var(--spacing) + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(var(--spacing) + env(safe-area-inset-bottom, 0px));
 }
 
 .header {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: var(--spacing);
     border-bottom: 1px solid var(--border);
 }
@@ -351,6 +352,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: var(--spacing);
     border-bottom: 1px solid var(--border);
 }
@@ -435,6 +437,7 @@ body {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: var(--spacing);
     border-bottom: 1px solid var(--border);
 }
@@ -636,6 +639,7 @@ body {
     z-index: 20;
     background: var(--bg);
     border-bottom: 1px solid var(--border);
+    padding-top: env(safe-area-inset-top, 0px);
 }
 
 .app-header {
@@ -662,7 +666,7 @@ body {
 .feed {
     max-width: 600px;
     margin: 0 auto;
-    padding: 0 var(--spacing) 3rem;
+    padding: 0 var(--spacing) calc(3rem + env(safe-area-inset-bottom, 0px));
     display: flex;
     flex-direction: column;
     gap: 2rem;
@@ -689,7 +693,7 @@ body {
 
 .day-card-header {
     position: sticky;
-    top: var(--app-header-height);
+    top: calc(var(--app-header-height) + env(safe-area-inset-top, 0px));
     z-index: 10;
     background: var(--bg);
     display: flex;
@@ -738,11 +742,10 @@ body {
     background: var(--accent-dim);
 }
 
-
 .td-weight .date {
     display: block;
     font-size: 0.7rem;
-    color: var(--muted);
+    color: var(--text-muted);
 }
 .pr-table {
     border-collapse: collapse;
@@ -764,6 +767,21 @@ body {
     text-align: right;
     font-variant-numeric: tabular-nums;
 }
+
+.td-weight a {
+    text-decoration: none;
+    color: var(--accent);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.1rem;
+    transition: opacity var(--dur-fast) var(--easing);
+}
+
+.td-weight a:active {
+    opacity: 0.7;
+}
+
 .td-kg {
     padding-left: 0.25rem;
     color: var(--muted);
@@ -826,7 +844,9 @@ tr.ghost td {
     align-items: center;
     justify-content: center;
     color: var(--border);
-    transition: color var(--dur-med) var(--easing), transform var(--dur-fast) var(--easing);
+    transition:
+        color var(--dur-med) var(--easing),
+        transform var(--dur-fast) var(--easing);
 }
 
 .save-btn:active {
@@ -875,11 +895,15 @@ tr.ghost td {
 /* ── View Transitions ────────────────────── */
 
 @keyframes fade-in {
-    from { opacity: 0; }
+    from {
+        opacity: 0;
+    }
 }
 
 @keyframes fade-out {
-    to { opacity: 0; }
+    to {
+        opacity: 0;
+    }
 }
 
 ::view-transition-old(root) {
