@@ -124,9 +124,7 @@ Tauri 2 has first-class Android support. The app logic (Svelte frontend + Rust b
 
 **Known issues to fix**:
 
-- *Transitions feel sudden*: No press feedback or page animations on mobile. Two parts:
-  1. Press feedback — add `:active` CSS states to buttons and list items (e.g. `transform: scale(0.97)` with a short `transition`). Remove the default `-webkit-tap-highlight-color` globally (already done).
-  2. Page transitions — use the View Transitions API via SvelteKit's `onNavigate` hook in `+layout.svelte`. Wrap `document.startViewTransition()` around the navigation completion; define `::view-transition-old/new(root)` animations in `app.css` for a subtle slide-fade (~150ms). The API is supported in the Chromium WebView version Tauri uses on modern Android; guard with `if (!document.startViewTransition) return` for safety.
+- ~~*Transitions feel sudden*~~: ✓ Done. Removed all `:hover` rules (irrelevant on touch). Added `--dur-fast: 80ms`, `--dur-med: 150ms`, `--easing: ease-out` CSS variables to `:root`. All transitions now use these variables. Added `:active` press feedback to every interactive element (`transform: scale` for small buttons, background change for full-width items). Fixed the `.back-btn` bug where `transition` was on `:active` instead of the base rule. Added View Transitions API page crossfade (150ms) via `onNavigate` in `+layout.svelte`.
 
 - *DnD triggers on full card body instead of handle only*: `svelte-dnd-action` initiates drag on any `pointerdown` within the zone. Fix: set `dragDisabled={isDragDisabled}` on the dndzone (default `true`), then set it `false` only on `pointerdown` of the `≡` handle element and back to `true` in the `onfinalize` handler. This restricts drag initiation to the handle. The drag handle (`≡`) is already rendered in `DayCard.svelte`.
 
@@ -137,6 +135,66 @@ Tauri 2 has first-class Android support. The app logic (Svelte frontend + Rust b
 
 
 **iOS** (lower priority): Similar process — requires a Mac with Xcode, an Apple Developer account for device testing, and `pnpm tauri ios init`. Defer until Android is working.
+
+---
+
+### 3a. Android build/test workflow
+
+The current process — `pnpm tauri android build` → wait → sign manually → `adb install` → wait — has too much friction for iterative testing. Two things to fix: iteration speed and release signing.
+
+**For iteration: use `tauri android dev` on a real device**
+
+`pnpm tauri android dev` connects to a USB-attached device via ADB, builds a debug APK (no signing required — uses the auto-generated debug keystore), installs it, and starts the app. Frontend changes hot-reload via Vite without reinstalling. Rust changes trigger a full rebuild and reinstall automatically.
+
+Prerequisites:
+- Enable Developer Options on the phone (tap Build Number 7 times in Settings → About)
+- Enable USB Debugging in Developer Options
+- Trust the Mac when prompted on the phone
+- Verify device is visible: `adb devices` should list it
+
+This replaces the manual build → sign → install loop entirely for day-to-day testing.
+
+**For release testing: automate signing**
+
+Release APKs require a signed keystore. Set this up once so `pnpm tauri android build` produces a ready-to-install APK without manual steps:
+
+1. Generate a keystore (one-time):
+   ```bash
+   keytool -genkey -v -keystore fitness-notes.jks -alias fitness-notes \
+     -keyalg RSA -keysize 2048 -validity 10000
+   ```
+   Store it outside the repo (e.g. `~/.android/fitness-notes.jks`).
+
+2. Configure Tauri to use it — in `src-tauri/gen/android/app/build.gradle.kts`, add a `signingConfigs` block:
+   ```kotlin
+   signingConfigs {
+       create("release") {
+           storeFile = file(System.getenv("ANDROID_KEYSTORE_PATH") ?: "")
+           storePassword = System.getenv("ANDROID_KEYSTORE_PASS") ?: ""
+           keyAlias = System.getenv("ANDROID_KEY_ALIAS") ?: ""
+           keyPassword = System.getenv("ANDROID_KEY_PASS") ?: ""
+       }
+   }
+   buildTypes {
+       release { signingConfig = signingConfigs.getByName("release") }
+   }
+   ```
+   Set the four env vars in your shell profile (not committed to the repo).
+
+3. Add a deploy script at the repo root (`deploy.sh`):
+   ```bash
+   #!/usr/bin/env bash
+   set -e
+   pnpm tauri android build
+   adb install -r src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk
+   echo "Installed."
+   ```
+   `adb install -r` replaces the existing install without losing data. Make executable: `chmod +x deploy.sh`. Run with `./deploy.sh`.
+
+**Summary**:
+- Daily iteration → `pnpm tauri android dev` (USB, debug, HMR)
+- Release testing → `./deploy.sh` (signs + installs in one step)
+- No more manual signing or copy-paste adb commands
 
 ---
 

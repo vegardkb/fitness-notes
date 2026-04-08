@@ -11,6 +11,9 @@
     --radius: 8px;
     --spacing: 1rem;
     --app-header-height: 2.75rem;
+    --dur-fast: 80ms;
+    --dur-med: 150ms;
+    --easing: ease-out;
 }
 [data-theme="light"] {
     --bg: #f5f5f5;
@@ -73,14 +76,11 @@ body {
     padding: 0.25rem 0.4rem;
     border-radius: var(--radius);
     line-height: 1;
-    transition:
-        color 0.1s,
-        background 0.1s;
+    transition: transform var(--dur-fast) var(--easing);
 }
 
-.date-nav-btn:hover {
-    color: var(--text);
-    background: var(--surface-hover);
+.date-nav-btn:active {
+    transform: scale(0.92);
 }
 
 .back-btn {
@@ -92,11 +92,11 @@ body {
     padding: 0;
     line-height: 1;
     text-decoration: none;
+    transition: transform var(--dur-fast) var(--easing);
 }
 
 .back-btn:active {
-    transform: scale(0.95);
-    transition: transform 0.1s;
+    transform: scale(0.92);
 }
 
 .list {
@@ -114,14 +114,14 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    transition: background 0.1s;
+    transition: background var(--dur-fast) var(--easing);
     text-align: left;
     width: 100%;
     color: var(--text);
     font-size: 1rem;
 }
 
-.list-item:hover {
+.list-item:active {
     background: var(--surface-hover);
 }
 
@@ -140,11 +140,11 @@ body {
     font-weight: 600;
     cursor: pointer;
     width: 100%;
-    transition: opacity 0.1s;
+    transition: opacity var(--dur-fast) var(--easing);
 }
 
-.add-btn:hover {
-    opacity: 0.9;
+.add-btn:active:not(:disabled) {
+    opacity: 0.8;
 }
 
 .add-btn:disabled {
@@ -234,10 +234,10 @@ body {
     font-size: 1rem;
     font-weight: 500;
     text-align: left;
-    transition: background 0.1s;
+    transition: background var(--dur-fast) var(--easing);
 }
 
-.exercise-card-header:hover {
+.exercise-card-header:active {
     background: var(--surface-hover);
 }
 
@@ -318,10 +318,10 @@ body {
     font-weight: 600;
     cursor: pointer;
     width: 100%;
-    transition: background 0.1s;
+    transition: background var(--dur-fast) var(--easing);
 }
 
-.delete-btn:hover {
+.delete-btn:active {
     background: rgba(248, 113, 113, 0.1);
 }
 
@@ -335,10 +335,10 @@ body {
     font-weight: 600;
     cursor: pointer;
     width: 100%;
-    transition: background 0.1s;
+    transition: background var(--dur-fast) var(--easing);
 }
 
-.update-btn:hover {
+.update-btn:active:not(:disabled) {
     background: var(--accent-dim);
 }
 
@@ -388,10 +388,10 @@ body {
     border: none;
     color: var(--text);
     gap: 3px;
-    transition: background 0.1s;
+    transition: background var(--dur-fast) var(--easing);
 }
 
-.cal-day:hover {
+.cal-day:active {
     background: var(--surface-hover);
 }
 
@@ -461,15 +461,11 @@ body {
     font-size: 0.875rem;
     font-weight: 500;
     cursor: pointer;
-    transition:
-        color 0.1s,
-        border-color 0.1s,
-        background 0.1s;
+    transition: background var(--dur-fast) var(--easing);
 }
 
-.range-pill:hover {
-    color: var(--text);
-    border-color: var(--text-muted);
+.range-pill:active {
+    background: var(--surface-hover);
 }
 
 .range-pill--active {
@@ -535,11 +531,11 @@ body {
     padding: 0.2rem;
     border-radius: 4px;
     cursor: pointer;
-    transition: color 0.1s;
+    transition: transform var(--dur-fast) var(--easing);
 }
 
-.header-tab:hover {
-    color: var(--text);
+.header-tab:active {
+    transform: scale(0.92);
 }
 
 .header-tab--active {
@@ -717,11 +713,11 @@ body {
     font-size: 0.8rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.1s;
+    transition: background var(--dur-fast) var(--easing);
     white-space: nowrap;
 }
 
-.measure-btn-inline:hover {
+.measure-btn-inline:active {
     background: var(--accent-dim);
 }
 
@@ -734,40 +730,14 @@ body {
     font-size: 0.8rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.1s;
+    transition: background var(--dur-fast) var(--easing);
     white-space: nowrap;
 }
 
-.add-btn-inline:hover {
+.add-btn-inline:active {
     background: var(--accent-dim);
 }
 
-/* ── Add Exercise Modal ───────────────────── */
-
-.modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    z-index: 100;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-}
-
-.modal {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-bottom: none;
-    border-radius: var(--radius) var(--radius) 0 0;
-    width: 100%;
-    max-width: 600px;
-    max-height: 80vh;
-    overflow-y: auto;
-    padding: var(--spacing);
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing);
-}
 
 .td-weight .date {
     display: block;
@@ -814,7 +784,7 @@ tr.ghost td {
     gap: 0.75rem;
     padding: 0.75rem 0;
     border-bottom: 1px solid var(--border);
-    transition: opacity 0.15s;
+    transition: opacity var(--dur-med) var(--easing);
 }
 .body-row--unsaved {
     opacity: 0.4;
@@ -856,7 +826,11 @@ tr.ghost td {
     align-items: center;
     justify-content: center;
     color: var(--border);
-    transition: color 0.15s;
+    transition: color var(--dur-med) var(--easing), transform var(--dur-fast) var(--easing);
+}
+
+.save-btn:active {
+    transform: scale(0.88);
 }
 
 .save-btn svg circle {
@@ -864,8 +838,8 @@ tr.ghost td {
     stroke: currentColor;
     stroke-width: 1.5;
     transition:
-        fill 0.15s,
-        stroke 0.15s;
+        fill var(--dur-med) var(--easing),
+        stroke var(--dur-med) var(--easing);
 }
 
 .save-btn--saved {
@@ -877,9 +851,6 @@ tr.ghost td {
     stroke: currentColor;
 }
 
-.save-btn:hover:not(.save-btn--saved) {
-    color: var(--text-muted);
-}
 .body-btn {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -894,8 +865,27 @@ tr.ghost td {
     justify-content: center;
     line-height: 1;
     flex-shrink: 0;
+    transition: transform var(--dur-fast) var(--easing);
 }
-.body-btn:hover {
-    color: var(--text);
-    border-color: var(--text-muted);
+
+.body-btn:active {
+    transform: scale(0.88);
+}
+
+/* ── View Transitions ────────────────────── */
+
+@keyframes fade-in {
+    from { opacity: 0; }
+}
+
+@keyframes fade-out {
+    to { opacity: 0; }
+}
+
+::view-transition-old(root) {
+    animation: fade-out var(--dur-med) var(--easing) forwards;
+}
+
+::view-transition-new(root) {
+    animation: fade-in var(--dur-med) var(--easing) forwards;
 }

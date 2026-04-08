@@ -9,17 +9,24 @@
 
     const exerciseId = $derived(Number(page.params.id ?? "0"));
 
+    let loading = $state(false);
     let history = $state<DayWorkout[]>([]);
 
     onMount(async () => {
-        history = await invoke<DayWorkout[]>("get_exercise_history", {
+        loading = true;
+        invoke<DayWorkout[]>("get_exercise_history", {
             exerciseId,
+        }).then((result) => {
+            history = result;
+            loading = false;
         });
     });
 </script>
 
 <div class="body">
-    {#if history.length === 0}
+    {#if loading}
+        <p class="empty">Loading…</p>
+    {:else if history.length === 0}
         <p class="empty">No sessions logged yet.</p>
     {:else}
         <div class="list">
