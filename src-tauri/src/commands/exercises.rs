@@ -204,19 +204,11 @@ pub fn delete_category(
 #[tauri::command]
 pub fn merge_exercise_into_existing(
     from_id: i64,
-    to_name: String,
+    to_id: i64,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<(), String> {
     let mut conn = db.lock().map_err(|e| e.to_string())?;
     let tx = conn.transaction().map_err(|e| e.to_string())?;
-
-    let to_id: i64 = tx
-        .query_row(
-            "SELECT id FROM exercises WHERE name = ?1",
-            rusqlite::params![to_name],
-            |row| row.get(0),
-        )
-        .map_err(|e| e.to_string())?;
 
     tx.execute(
         "DELETE FROM workout_exercises
@@ -250,6 +242,31 @@ pub fn merge_exercise_into_existing(
 
     recompute_pr_flags(&conn, to_id).map_err(|e| e.to_string())?;
 
+    Ok(())
+}
+
+#[tauri::command]
+pub fn merge_category_into_existing(
+    from_id: i64,
+    to_id: i64,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<(), String> {
+    let mut conn = db.lock().map_err(|e| e.to_string())?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+    tx.execute(
+        "UPDATE exercises SET category_id = ?1 WHERE category_id = ?2",
+        rusqlite::params![to_id, from_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    tx.execute(
+        "DELETE FROM categories WHERE id = ?1",
+        rusqlite::params![from_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    tx.commit().map_err(|e| e.to_string())?;
     Ok(())
 }
 

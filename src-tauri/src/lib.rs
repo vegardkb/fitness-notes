@@ -5,8 +5,8 @@ use crate::commands::body::{
 use crate::commands::exercises::{
     create_category, create_exercise, delete_category, delete_exercise, get_exercise,
     get_exercise_graph_data, get_exercise_history, get_last_set, get_rep_maxes,
-    list_exercise_categories, list_exercises_in_category, merge_exercise_into_existing,
-    rename_category, rename_exercise,
+    list_exercise_categories, list_exercises_in_category, merge_category_into_existing,
+    merge_exercise_into_existing, rename_category, rename_exercise,
 };
 use crate::commands::import::{import_fitnotes_rows, parse_fitnotes_csv};
 use crate::commands::sets::{delete_set, reorder_exercises, reorder_sets, upsert_set};
@@ -39,6 +39,7 @@ pub fn run() {
             delete_exercise,
             rename_exercise,
             merge_exercise_into_existing,
+            merge_category_into_existing,
             create_category,
             delete_category,
             rename_category,

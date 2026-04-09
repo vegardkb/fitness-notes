@@ -8,6 +8,9 @@
 - **Body tracker** (`/body/[date]`): Log measurements per metric, auto-derived body fat % (Navy formula) and FFMI, history view
 - **Settings** (`/settings`): FitNotes CSV import wizard, delete all data
 - **Light/dark mode**: CSS variables defined; `dark_mode` stored in DB but not yet wired to the UI
+- **Exercise/category management** (`/exercises/[date]`): Category → exercise drill-down, full CRUD (create, rename, delete, merge) for both categories and exercises via inline inputs and ⋯ context menus. Merge moves all sets/history to the target and recomputes PRs. Errors surface as toasts.
+- **Migration infrastructure**: `run_migrations()` in `database.rs` with downgrade guard and per-version functions. WAL mode enabled at startup. Automatic daily backups (last 14 kept) on every launch.
+- **Android build**: App runs on Android via Tauri. Touch targets, DnD, viewport, and file picker verified. Build via `pnpm tauri android build`; iOS deferred.
 
 ---
 
@@ -21,7 +24,7 @@ workout_exercises   -- which exercises appear on a date, with order
 sets                -- individual sets (weight_kg, reps, was_pr_at_time, is_current_pr)
 
 body_metrics        -- metric definitions (Weight kg, Waist cm, Body Fat %, ...)
-body_measurements   -- logged values (date, measure_id, value)
+body_measurements   -- logged values (date, measure_id, value, source)
 
 user_settings       -- single row: height_cm, unit, dark_mode, estimate_body_fat, sex
 ```
@@ -34,45 +37,39 @@ user_settings       -- single row: height_cm, unit, dark_mode, estimate_body_fat
 
 ## Remaining features
 
-### 0. Migration infrastructure ✓
-
-Implemented in `src-tauri/src/database.rs`. `SCHEMA_VERSION` is a `const u32` at the top of the file. `run_migrations` reads `PRAGMA user_version`, returns an error if the DB is ahead of the code (downgrade guard), and runs each numbered `migrate_N` function under the condition `current < N && N <= SCHEMA_VERSION`. Version is bumped immediately after each migration succeeds. Current version: **1** (full initial schema).
-
 Pending migrations to add as features land:
 ```
-v2: ALTER TABLE user_settings ADD COLUMN season_start TEXT DEFAULT '01-01'
-v3: ALTER TABLE user_settings ADD COLUMN use_seasons BOOLEAN DEFAULT true
-v4: ALTER TABLE sets ADD COLUMN is_season_pr BOOLEAN DEFAULT false
-v5: CREATE TABLE templates / template_exercises
+v2: ALTER TABLE body_measurements ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'
+v3: ALTER TABLE user_settings ADD COLUMN season_start TEXT DEFAULT '01-01'
+v4: ALTER TABLE user_settings ADD COLUMN use_seasons BOOLEAN DEFAULT true
+v5: ALTER TABLE sets ADD COLUMN is_season_pr BOOLEAN DEFAULT false
+v6: CREATE TABLE templates / template_exercises
 ```
 
 ---
 
-### 1. Create and manage exercises
+### 1. Body measurement source tagging
 
-Currently exercises can only enter the DB via the FitNotes import. There is no UI for adding exercises manually. This is required before using the app without importing data.
+Add a `source` column to `body_measurements` to track where each value came from, preventing auto-calculated estimates from contaminating manually entered or externally measured data.
 
-**Commands** (all implemented):
-- `create_exercise(name, category_id) → i64`
-- `delete_exercise(id)` — blocked if sets exist for this exercise
-- `rename_exercise(id, name)` — blocked if name already taken (UNIQUE constraint); returns "Exercise not found" if id invalid
-- `create_category(name) → i64`
-- `delete_category(id)` — blocked if exercises or sets exist in the category
-- `rename_category(id, name)` — blocked if name already taken; returns "Category not found" if id invalid
-- `merge_exercise_into_existing(from_id, to_name)` — re-points all sets and workout_exercises from `from` to `to`, handles the unique constraint on `(workout_id, exercise_id)` by deleting the `from` row where `to` already appears on the same day, deletes `from`, then calls `recompute_pr_flags(to_id)`
+**DB change** (migration 2):
+```sql
+ALTER TABLE body_measurements ADD COLUMN source TEXT NOT NULL DEFAULT 'manual';
+-- values: 'manual', 'navy', 'dexa', 'caliper', 'fitnotes'
+```
 
-**Rename conflict behavior**: both `exercises.name` and `categories.name` have UNIQUE constraints in the DB. A rename to a duplicate name returns a SQLite UNIQUE constraint error as an `Err(String)`. The frontend catches this and offers the user Merge / Cancel (exercises only; categories cannot be merged).
+**Write behavior**:
+- Navy auto-calculation writes `source = 'navy'`
+- Manual entry in the body tracker writes `source = 'manual'`
+- FitNotes import writes `source = 'fitnotes'`
+- Future methods (DEXA, caliper) write their own tag
 
-**Frontend**:
-- Replace `AddExerciseModal.svelte` with a new route `src/routes/exercises/[date=date]/+page.svelte`
-- The "+Add exercise" button on the feed navigates to `/exercises/[date]` instead of opening the modal; delete `AddExerciseModal.svelte`
-- The page has the same category → exercise drill-down as the old modal
-- Header of each view has a "+ New" button (create category / create exercise in current category)
-- Each list item has a ⋯ menu with Rename and Delete actions
-- Rename: inline text input replacing the item; on UNIQUE error show "An exercise named X already exists — merge Y into X?" with Merge / Cancel
-- Delete: confirmation prompt; shows a blocking error if the item has sets (exercise) or exercises/sets (category)
-- Tapping an exercise item (outside the ⋯ menu) navigates to `/exercise/[id]/[date]` using `replaceState` so the browser history goes feed → exercise, skipping the exercises browser
-- The exercise page's back button already goes to `/?date=[date]` (the feed) — no change needed there
+**Read behavior**:
+- FFMI is derived at query time, preferring non-navy sources when multiple exist for the same date (prefer: dexa > caliper > manual > navy)
+- Rows can be filtered by source to exclude estimates (e.g. show only measured body fat)
+- No auto-deletion when `estimate_body_fat` is toggled off — filter on read instead
+
+No UI changes required yet. The value space is reserved for future methods without needing a data migration later.
 
 ---
 
@@ -92,53 +89,7 @@ FitNotes exports body tracker data as CSV (exact column format TBD — inspect a
 
 ---
 
-### 3. Android build
-
-Tauri 2 has first-class Android support. The app logic (Svelte frontend + Rust backend) is unchanged — Tauri handles the platform layer. This is the first time building for mobile, so setup is the main effort.
-
-**One-time setup** (developer machine):
-1. Install Android Studio (includes the Android SDK and emulator)
-2. Install Android NDK via the SDK Manager in Android Studio (Tauri needs this to cross-compile Rust)
-3. Set environment variables: `ANDROID_HOME` (SDK path) and `NDK_HOME` (NDK path)
-4. Install Rust Android targets: `rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android`
-5. Run `pnpm tauri android init` in the project root — this generates an `src-tauri/gen/android/` directory with the Android project
-
-**Development**:
-- `pnpm tauri android dev` — builds and deploys to a connected device or emulator with hot reload
-- The SQLite DB file path (currently resolved via `app.path().app_data_dir()`) works on Android — Tauri maps it to the app's internal storage
-
-**Things to verify/fix before Android**:
-- Touch targets: the current `-`/`+` buttons and row heights may be too small for fingers — aim for at least 44px tap targets
-- The `svelte-dnd-action` drag-and-drop library for reordering sets/exercises uses mouse events; verify it works on touch or find a touch-compatible alternative
-- File picker for CSV import uses a native dialog (`tauri-plugin-dialog`) — verify the Android plugin is included in `Cargo.toml` and `tauri.conf.json` capabilities
-- The app header/nav assumes a desktop window width; test on phone viewport (360–390px wide)
-
-**Build for distribution**:
-- `pnpm tauri android build` — produces an APK or AAB
-- For personal use, install the APK directly (no Play Store needed): enable "Install from unknown sources" on the device, transfer the APK, install
-
-**Files**:
-- `src-tauri/tauri.conf.json` — may need `android` section for permissions (storage, etc.)
-- `src-tauri/Cargo.toml` — verify mobile-compatible plugin versions
-- CSS — audit touch target sizes
-
-**Known issues to fix**:
-
-- ~~*Transitions feel sudden*~~: ✓ Done. Removed all `:hover` rules (irrelevant on touch). Added `--dur-fast: 80ms`, `--dur-med: 150ms`, `--easing: ease-out` CSS variables to `:root`. All transitions now use these variables. Added `:active` press feedback to every interactive element (`transform: scale` for small buttons, background change for full-width items). Fixed the `.back-btn` bug where `transition` was on `:active` instead of the base rule. Added View Transitions API page crossfade (150ms) via `onNavigate` in `+layout.svelte`.
-
-- *DnD triggers on full card body instead of handle only*: `svelte-dnd-action` initiates drag on any `pointerdown` within the zone. Fix: set `dragDisabled={isDragDisabled}` on the dndzone (default `true`), then set it `false` only on `pointerdown` of the `≡` handle element and back to `true` in the `onfinalize` handler. This restricts drag initiation to the handle. The drag handle (`≡`) is already rendered in `DayCard.svelte`.
-
-- *Weights and reps not pre-filled for first set of the day*: Consider adding a get_last_set(exercise_id) command, if data is shared across all the exercise/[id]/* routes, the get_last_set command is not needed (just get the last/first set that is fetched).
-- *Navigation with the exercise header is not smooth*: Things that should not need to reload are reloading, like the header. This is not really noticable on my macbook with m3, but is noticable on my old android phone, where things are noticably disappearing, moving around and appearing during refresh, giving a janky feel. 
-- *Slow loading on history and graph view*: Slow is an exageration, but on exercises with a lot of sets and on a slow device it is noticable. Could maybe consider fetching last month of data first and display and then fetch the rest. (defaulting to 1month for the graph). Also considering caching the fetched data for an exercise, though this will likely require a rewrite of the data structures.
-
-
-
-**iOS** (lower priority): Similar process — requires a Mac with Xcode, an Apple Developer account for device testing, and `pnpm tauri ios init`. Defer until Android is working.
-
----
-
-### 3a. Android build/test workflow
+### 3. Android build/test workflow
 
 The current process — `pnpm tauri android build` → wait → sign manually → `adb install` → wait — has too much friction for iterative testing. Two things to fix: iteration speed and release signing.
 
@@ -356,11 +307,13 @@ New Rust commands:
 
 1. ~~**Migration infrastructure**~~ ✓ done
 2. ~~**WAL mode + automatic backups**~~ ✓ done
-3. **Create and manage exercises** — needed to use the app without a FitNotes import
-4. **Body measurements import** — needed to bring in historical data before going mobile
-5. **Android build** — get the app on device; do UI/touch fixes as needed
-6. **Settings menu** — user profile, dark mode, manual export/restore
-7. **Complete body tracker** (graph + PRs)
-8. **Workout templates**
-9. **Season PRs** — depends on settings
-10. **Analysis page** — most complex, last
+3. ~~**Create and manage exercises**~~ ✓ done
+4. ~~**Android build**~~ ✓ done
+5. **Body measurement source tagging** — must land before import so rows carry correct provenance
+6. **Body measurements import** — needed to bring in historical data before going mobile
+7. **Android build/test workflow** — reduce iteration friction
+8. **Settings menu** — user profile, dark mode, manual export/restore
+9. **Complete body tracker** (graph + PRs)
+10. **Workout templates**
+11. **Season PRs** — depends on settings
+12. **Analysis page** — most complex, last

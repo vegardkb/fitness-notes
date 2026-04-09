@@ -2,6 +2,7 @@
     import "../app.css";
     import { onMount } from "svelte";
     import { onNavigate } from "$app/navigation";
+    import Toaster from "$lib/Toaster.svelte";
 
     let { children } = $props();
 
@@ -27,3 +28,4 @@
 </script>
 
 {@render children()}
+<Toaster />
