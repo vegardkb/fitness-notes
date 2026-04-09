@@ -7,6 +7,7 @@
     import type { DayMeasurement } from "$lib/body";
     import BodyHeader from "$lib/BodyHeader.svelte";
     import { bodyHrefs } from "$lib/body";
+    import { ChevronRight } from "lucide-svelte";
 
     const date = $derived(page.url.searchParams.get("from") ?? "");
     const hrefs = $derived(bodyHrefs(date));
@@ -42,7 +43,7 @@
                         onclick={() => goto(`/body/${day.date}`)}
                     >
                         <span>{formatDate(day.date)}</span>
-                        <span class="muted">→</span>
+                        <span class="muted"><ChevronRight size={16} strokeWidth={1.5} /></span>
                     </button>
                     <div class="exercise-card-sets">
                         {#each day.measurements as measurement}

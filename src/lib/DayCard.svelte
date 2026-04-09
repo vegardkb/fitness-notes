@@ -4,6 +4,7 @@
     import { onMount } from "svelte";
     import { dndzone } from "svelte-dnd-action";
     import { formatDate } from "$lib/date";
+    import { GripVertical, ChevronRight } from "lucide-svelte";
     import type { ExerciseWithSets } from "$lib/exercise";
     import { formatWeight } from "$lib/exercise";
 
@@ -82,10 +83,10 @@
                             role="button"
                             tabindex="0"
                             aria-label="Drag to reorder"
-                            onpointerdown={startDrag}>≡</span
-                        >
+                            onpointerdown={startDrag}
+                        ><GripVertical size={16} strokeWidth={1.5} /></span>
                         <span>{ex.exercise_name}</span>
-                        <span class="muted">→</span>
+                        <span class="muted"><ChevronRight size={16} strokeWidth={1.5} /></span>
                     </button>
                     <div class="exercise-card-sets">
                         {#each ex.sets as set, i}

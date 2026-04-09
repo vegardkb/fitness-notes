@@ -2,6 +2,7 @@
     import { goto } from "$app/navigation";
     import { invoke } from "@tauri-apps/api/core";
     import { todayStr } from "$lib/date";
+    import { ChevronLeft, ChevronRight } from "lucide-svelte";
 
     const MONTH_NAMES = [
         "January",
@@ -72,9 +73,9 @@
 
 <main class="page">
     <div class="cal-header">
-        <button class="date-nav-btn" onclick={prevMonth}>‹</button>
+        <button class="date-nav-btn" onclick={prevMonth}><ChevronLeft size={20} strokeWidth={1.5} /></button>
         <span class="cal-month-label">{MONTH_NAMES[month - 1]} {year}</span>
-        <button class="date-nav-btn" onclick={nextMonth}>›</button>
+        <button class="date-nav-btn" onclick={nextMonth}><ChevronRight size={20} strokeWidth={1.5} /></button>
     </div>
 
     <div class="cal-weekdays">

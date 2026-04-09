@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { Category } from "$lib/exercise";
     import { invoke } from "@tauri-apps/api/core";
+    import { ArrowLeft, ChevronRight } from "lucide-svelte";
 
     type ParsedRow = {
         date: string;
@@ -212,7 +213,7 @@
 
 <div class="page">
     <div class="history-header">
-        <a class="back-btn" href="/">←</a>
+        <a class="back-btn" href="/"><ArrowLeft size={18} strokeWidth={1.5} /></a>
         <h1>Settings</h1>
     </div>
 
@@ -345,7 +346,7 @@
                                         class="back-btn"
                                         onclick={() =>
                                             (pickerView = "categories")}
-                                        >←</button
+                                        ><ArrowLeft size={18} strokeWidth={1.5} /></button
                                     >
                                     <p class="import-unknown-meta">
                                         Select exercise
@@ -368,7 +369,7 @@
                 </div>
             {/each}
         </div>
-        <button class="add-btn" onclick={continueToConfirm}>Continue →</button>
+        <button class="add-btn" onclick={continueToConfirm} style="display:flex;align-items:center;justify-content:center;gap:0.4rem;">Continue <ChevronRight size={16} strokeWidth={1.5} /></button>
         <button class="delete-btn" onclick={reset}>Cancel</button>
     {:else if phase.name === "confirming"}
         <div class="import-summary">

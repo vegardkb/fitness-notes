@@ -1,5 +1,9 @@
 <script lang="ts">
     import "../app.css";
+    import "@fontsource/dm-sans/400.css";
+    import "@fontsource/dm-sans/600.css";
+    import "@fontsource/source-serif-4/400.css";
+    import "@fontsource/source-serif-4/600.css";
     import { onMount } from "svelte";
     import { onNavigate } from "$app/navigation";
     import Toaster from "$lib/Toaster.svelte";

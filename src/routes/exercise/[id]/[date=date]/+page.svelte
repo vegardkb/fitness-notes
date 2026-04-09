@@ -5,6 +5,7 @@
     import { dndzone } from "svelte-dnd-action";
     import type { Set, ExerciseWithSets, SetMinimal } from "$lib/exercise";
     import { formatWeight } from "$lib/exercise";
+    import { SquareMinus, SquarePlus, GripVertical } from "lucide-svelte";
 
     const exerciseId = $derived(Number(page.params.id ?? "0"));
     const date = $derived(page.params.date ?? "");
@@ -111,7 +112,7 @@
                     class:list-item--selected={set_selected?.id === set.id}
                     onclick={() => selectSet(set)}
                 >
-                    <span class="drag-handle">≡</span>
+                    <span class="drag-handle"><GripVertical size={16} strokeWidth={1.5} /></span>
                     <span class="set-stats">
                         <span class="stat-val stat-val--weight"
                             >{formatWeight(set.weight_kg)}</span
@@ -140,12 +141,12 @@
                         class="body-btn"
                         onclick={() =>
                             (weightInput = Math.max(weightInput - 2.5, 0))}
-                        >-</button
+                        ><SquareMinus size={20} strokeWidth={1.5} /></button
                     >
                     <input type="number" bind:value={weightInput} />
                     <button
                         class="body-btn"
-                        onclick={() => (weightInput += 2.5)}>+</button
+                        onclick={() => (weightInput += 2.5)}><SquarePlus size={20} strokeWidth={1.5} /></button
                     >
                 </div>
             </div>
@@ -155,11 +156,11 @@
                     <button
                         class="body-btn"
                         onclick={() => (repsInput = Math.max(repsInput - 1, 0))}
-                        >-</button
+                        ><SquareMinus size={20} strokeWidth={1.5} /></button
                     >
                     <input type="number" bind:value={repsInput} />
                     <button class="body-btn" onclick={() => (repsInput += 1)}
-                        >+</button
+                        ><SquarePlus size={20} strokeWidth={1.5} /></button
                     >
                 </div>
             </div>

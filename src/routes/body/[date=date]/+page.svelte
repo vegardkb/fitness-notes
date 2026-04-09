@@ -6,6 +6,7 @@
 
     import BodyHeader from "$lib/BodyHeader.svelte";
     import type { Measurement, Metric } from "$lib/body";
+    import { SquareMinus, SquarePlus, Circle } from "lucide-svelte";
 
     const date = $derived(page.params.date ?? "");
     const hrefs = $derived(bodyHrefs(date));
@@ -103,7 +104,7 @@
                     <td class="body-value">
                         <button
                             class="body-btn"
-                            onclick={() => incDec(row, -0.1)}>-</button
+                            onclick={() => incDec(row, -0.1)}><SquareMinus size={20} strokeWidth={1.5} /></button
                         >
                         <div class="field">
                             <input
@@ -114,7 +115,7 @@
                         </div>
                         <button
                             class="body-btn"
-                            onclick={() => incDec(row, 0.1)}>+</button
+                            onclick={() => incDec(row, 0.1)}><SquarePlus size={20} strokeWidth={1.5} /></button
                         >
                     </td>
                     <td>
@@ -124,9 +125,7 @@
                             class:save-btn--saved={row.id !== null}
                             onclick={() => toggle(row)}
                         >
-                            <svg width="20" height="20" viewBox="0 0 20 20">
-                                <circle cx="10" cy="10" r="8" />
-                            </svg>
+                            <Circle size={20} strokeWidth={1.5} />
                         </button>
                     </td>
                 </tr>

@@ -8,6 +8,7 @@
 
 <script lang="ts">
     import { onMount } from "svelte";
+    import { Calendar, Settings } from "lucide-svelte";
     import DayCard from "$lib/DayCard.svelte";
     import { offsetDate, todayStr, isValidDate } from "$lib/date";
 
@@ -147,38 +148,10 @@
             <span class="app-title">Fitness Notes</span>
             <div class="app-header-icons">
                 <a href="/calendar" class="back-btn" aria-label="Calendar">
-                    <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 20 20"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="1.5"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <rect x="2" y="4" width="16" height="14" rx="2" />
-                        <line x1="2" y1="8" x2="18" y2="8" />
-                        <line x1="6" y1="2" x2="6" y2="6" />
-                        <line x1="14" y1="2" x2="14" y2="6" />
-                    </svg>
+                    <Calendar size={20} strokeWidth={1.5} />
                 </a>
                 <a href="/settings" class="back-btn" aria-label="Settings">
-                    <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 20 20"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="1.5"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <circle cx="10" cy="10" r="2.5" />
-                        <path
-                            d="M10 2v1.5M10 16.5V18M2 10h1.5M16.5 10H18M4.1 4.1l1.1 1.1M14.8 14.8l1.1 1.1M4.1 15.9l1.1-1.1M14.8 5.2l1.1-1.1"
-                        />
-                    </svg>
+                    <Settings size={20} strokeWidth={1.5} />
                 </a>
             </div>
         </header>
