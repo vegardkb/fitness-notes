@@ -4,7 +4,7 @@
     import { onMount } from "svelte";
     import { dndzone } from "svelte-dnd-action";
     import { formatDate } from "$lib/date";
-    import { GripVertical, ChevronRight } from "lucide-svelte";
+    import { GripVertical, ChevronRight, PersonStanding } from "lucide-svelte";
     import type { ExerciseWithSets } from "$lib/exercise";
     import { formatWeight } from "$lib/exercise";
 
@@ -47,10 +47,9 @@
     <div class="day-card-header">
         <span class="day-label">{formatDate(date)}</span>
         <div class="day-card-btns">
-            <button
-                class="measure-btn-inline"
-                onclick={() => goto(`/body/${date}`)}>+ Body</button
-            >
+            <button class="back-btn" onclick={() => goto(`/body/${date}`)}>
+                <PersonStanding size={18} strokeWidth={1.5} />
+            </button>
             <button
                 class="add-btn-inline"
                 onclick={() => goto(`/exercises/${date}`)}>+ Add</button
@@ -84,9 +83,12 @@
                             tabindex="0"
                             aria-label="Drag to reorder"
                             onpointerdown={startDrag}
-                        ><GripVertical size={16} strokeWidth={1.5} /></span>
+                            ><GripVertical size={16} strokeWidth={1.5} /></span
+                        >
                         <span>{ex.exercise_name}</span>
-                        <span class="muted"><ChevronRight size={16} strokeWidth={1.5} /></span>
+                        <span class="muted"
+                            ><ChevronRight size={16} strokeWidth={1.5} /></span
+                        >
                     </button>
                     <div class="exercise-card-sets">
                         {#each ex.sets as set, i}

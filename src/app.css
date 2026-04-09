@@ -41,7 +41,12 @@ body {
     min-height: 100vh;
 }
 
-h1, .day-label, .cal-month-label, .app-title, .dialog-title, .stat-val {
+h1,
+.day-label,
+.cal-month-label,
+.app-title,
+.dialog-title,
+.stat-val {
     font-family: "Source Serif 4", serif;
 }
 
@@ -806,7 +811,7 @@ h1, .day-label, .cal-month-label, .app-title, .dialog-title, .stat-val {
 
 .measure-btn-inline {
     background: none;
-    border: 1px solid var(--accent);
+    border: none;
     color: var(--accent);
     border-radius: var(--radius);
     padding: 0.25rem 0.6rem;
@@ -887,17 +892,27 @@ tr.ghost td {
 
 /* Body Measurements */
 .body-grid {
-    display: flex;
-    flex-direction: column;
+    width: 100%;
 }
 .body-row {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid var(--border);
     transition: opacity var(--dur-med) var(--easing);
+}
+.body-row td,
+.body-row th {
+    padding: 0.75rem 0;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+.body-row td:first-child,
+.body-row th:first-child {
+    width: 100%;
+    white-space: normal;
+    padding-right: 0.75rem;
+}
+.body-row td + td,
+.body-row th + th {
+    padding-left: 0.75rem;
 }
 .body-row--unsaved {
     opacity: 0.4;
@@ -906,6 +921,7 @@ tr.ghost td {
 .body-value {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 0.25rem;
 }
 .body-value input {

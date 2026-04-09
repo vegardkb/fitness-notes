@@ -26,7 +26,8 @@
         ]);
         measurementsFilled = metrics.map((metric) => ({
             value: round(
-                measurements.find((m) => m.metric.id === metric.id)?.value ?? 0,
+                measurements.find((m) => m.metric.id === metric.id)?.value ??
+                    NaN,
             ),
             metric,
             date:
@@ -37,6 +38,12 @@
                     (m) => m.metric.id === metric.id && m.date === date,
                 )?.id ?? null,
         }));
+        // sort by is_derived and then name
+        measurementsFilled = measurementsFilled.sort(
+            (a, b) =>
+                Number(b.metric.is_derived) - Number(a.metric.is_derived) ||
+                a.metric.name.localeCompare(b.metric.name),
+        );
     }
 
     function round(value: number): number {
@@ -44,6 +51,9 @@
     }
 
     async function toggle(row: Measurement) {
+        if (row.metric.is_derived) {
+            return;
+        }
         if (row.id != null) {
             await deleteMeasurement(row);
         } else {
@@ -52,11 +62,18 @@
     }
 
     async function incDec(row: Measurement, delta: number) {
-        row.value = round(Math.max(row.value + delta, 0));
+        if (row.metric.is_derived) {
+            return;
+        }
+        const base = isNaN(row.value) ? 0 : row.value;
+        row.value = round(Math.max(base + delta, 0));
         save(row);
     }
 
     async function save(row: Measurement) {
+        if (row.metric.is_derived) {
+            return;
+        }
         let i = measurementsFilled.findIndex((m) => m.id === row.id);
         let id = await invoke<number>("upsert_body_measurement", {
             id: row.id,
@@ -69,12 +86,22 @@
     }
 
     async function deleteMeasurement(row: Measurement) {
+        if (row.metric.is_derived) {
+            return;
+        }
         let i = measurementsFilled.findIndex((m) => m.id === row.id);
         if (row.id != null) {
             await invoke<void>("delete_body_measurement", { id: row.id });
             measurementsFilled[i] = { ...measurementsFilled[i], id: null };
             await fetchMeasurements();
         }
+    }
+
+    function muteRow(row: Measurement) {
+        return (
+            (row.id === null && !row.metric.is_derived) ||
+            (row.metric.is_derived && (isNaN(row.value) || row.date != date))
+        );
     }
 </script>
 
@@ -99,35 +126,61 @@
         </thead>
         <tbody>
             {#each measurementsFilled as row}
-                <tr class="body-row" class:body-row--unsaved={row.id === null}>
-                    <td>{row.metric.name} ({row.metric.unit})</td>
-                    <td class="body-value">
-                        <button
-                            class="body-btn"
-                            onclick={() => incDec(row, -0.1)}><SquareMinus size={20} strokeWidth={1.5} /></button
+                <tr class="body-row" class:body-row--unsaved={muteRow(row)}>
+                    {#if row.metric.is_derived}
+                        <td
+                            ><span class="set-label">{row.metric.name}</span>
+                            <span class="stat-unit">{row.metric.unit}</span></td
                         >
-                        <div class="field">
-                            <input
-                                type="number"
-                                bind:value={row.value}
-                                onblur={() => save(row)}
-                            />
-                        </div>
-                        <button
-                            class="body-btn"
-                            onclick={() => incDec(row, 0.1)}><SquarePlus size={20} strokeWidth={1.5} /></button
+                        <td class="body-value">
+                            <span class="stat-val">
+                                {isNaN(row.value) ? "—" : row.value}
+                            </span>
+                        </td>
+                        <td></td>
+                    {:else}
+                        <td
+                            ><span>{row.metric.name}</span>
+                            <span class="body-unit">{row.metric.unit}</span></td
                         >
-                    </td>
-                    <td>
-                        <button
-                            class="save-btn"
-                            title="Save"
-                            class:save-btn--saved={row.id !== null}
-                            onclick={() => toggle(row)}
-                        >
-                            <Circle size={20} strokeWidth={1.5} />
-                        </button>
-                    </td>
+                        <td class="body-value">
+                            <button
+                                class="body-btn"
+                                onclick={() => incDec(row, -0.1)}
+                                ><SquareMinus
+                                    size={20}
+                                    strokeWidth={1.5}
+                                /></button
+                            >
+                            <div class="field">
+                                <span class="stat-val">
+                                    <input
+                                        type="number"
+                                        bind:value={row.value}
+                                        onblur={() => save(row)}
+                                    /></span
+                                >
+                            </div>
+                            <button
+                                class="body-btn"
+                                onclick={() => incDec(row, 0.1)}
+                                ><SquarePlus
+                                    size={20}
+                                    strokeWidth={1.5}
+                                /></button
+                            >
+                        </td>
+                        <td>
+                            <button
+                                class="save-btn"
+                                title="Save"
+                                class:save-btn--saved={row.id !== null}
+                                onclick={() => toggle(row)}
+                            >
+                                <Circle size={20} strokeWidth={1.5} />
+                            </button>
+                        </td>
+                    {/if}
                 </tr>
             {/each}
         </tbody>

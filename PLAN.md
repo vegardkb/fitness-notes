@@ -5,7 +5,7 @@
 - **Feed** (`/`): Infinite-scroll daily workout log, drag-to-reorder exercises and sets, PR badges
 - **Calendar** (`/calendar`): Month view with activity dots, navigates to feed date
 - **Exercise tracker** (`/exercise/[id]/[date]`): Full CRUD for sets, PR tracking, history, graph (estimated 1RM), PRs table (nRM viewer)
-- **Body tracker** (`/body/[date]`): Log measurements per metric, auto-derived body fat % (Navy formula) and FFMI, history view
+- **Body tracker** (`/body/[date]`): Log measurements per metric; derived metrics (BMI, Body Fat (Navy), FFMI (Navy)) computed on the fly from stored inputs, never written to DB; history view. `is_derived` flag in `body_metrics` controls read-only rendering. Derived metric dates reflect the most recently updated input.
 - **Settings** (`/settings`): FitNotes CSV import wizard, delete all data
 - **Light/dark mode**: CSS variables defined; `dark_mode` stored in DB but not yet wired to the UI
 - **Exercise/category management** (`/exercises/[date]`): Category → exercise drill-down, full CRUD (create, rename, delete, merge) for both categories and exercises via inline inputs and ⋯ context menus. Merge moves all sets/history to the target and recomputes PRs. Errors surface as toasts.
@@ -39,92 +39,11 @@ user_settings       -- single row: height_cm, unit, dark_mode, estimate_body_fat
 
 Pending migrations to add as features land:
 ```
-v2: body_metrics overhaul — is_derived column, FitNotes renames, derived metric rows (see section 1)
-v3: ALTER TABLE user_settings ADD COLUMN season_start TEXT DEFAULT '01-01'
-v4: ALTER TABLE user_settings ADD COLUMN use_seasons BOOLEAN DEFAULT true
-v5: ALTER TABLE sets ADD COLUMN is_season_pr BOOLEAN DEFAULT false
-v6: CREATE TABLE templates / template_exercises
+v4: ALTER TABLE user_settings ADD COLUMN season_start TEXT DEFAULT '01-01'
+v5: ALTER TABLE user_settings ADD COLUMN use_seasons BOOLEAN DEFAULT true
+v6: ALTER TABLE sets ADD COLUMN is_season_pr BOOLEAN DEFAULT false
+v7: CREATE TABLE templates / template_exercises
 ```
-
----
-
-### 1. Body metrics overhaul
-
-Two concerns addressed together in migration v2, since both must land before the import tool for correct metric name matching.
-
-**a) Derived metrics**
-
-Add `is_derived` to `body_metrics`. Derived metrics appear in `list_metrics` with `is_derived: true` so the UI renders them read-only (no edit/delete, no manual entry field). They are computed on the fly from other stored measurements — no rows are ever written to `body_measurements` for these `metric_id`s.
-
-| Metric | Inputs | Formula |
-|---|---|---|
-| Body Fat (Navy) | waist, neck, height, sex (+ hip for female) | US Navy formula |
-| FFMI (Navy) | weight, Body Fat (Navy), height | fat-free mass / height² |
-| BMI | weight, height (from user_settings) | weight_kg / height_m² |
-
-**b) FitNotes compatibility renames**
-
-Rename bilateral metrics to left/right variants so FitNotes imports map without manual resolution. Existing measurements are preserved under the renamed metric.
-
-| Before | After |
-|---|---|
-| Arm | Upper Arm (Left) |
-| *(new)* | Upper Arm (Right) |
-| *(new)* | Forearm (Left) |
-| *(new)* | Forearm (Right) |
-| Thigh | Thigh (Left) |
-| *(new)* | Thigh (Right) |
-| Calf | Calf (Left) |
-| *(new)* | Calf (Right) |
-
-**Migration v2 SQL**:
-```sql
--- Add is_derived flag
-ALTER TABLE body_metrics ADD COLUMN is_derived BOOLEAN NOT NULL DEFAULT false;
-
--- FitNotes compatibility renames (existing measurements follow the renamed row)
-UPDATE body_metrics SET name = 'Upper Arm (Left)' WHERE name = 'Arm';
-INSERT OR IGNORE INTO body_metrics (name, unit)
-    SELECT 'Upper Arm (Right)', unit FROM body_metrics WHERE name = 'Upper Arm (Left)';
-
-INSERT OR IGNORE INTO body_metrics (name, unit) VALUES ('Forearm (Left)', 'cm');
-INSERT OR IGNORE INTO body_metrics (name, unit) VALUES ('Forearm (Right)', 'cm');
-
-UPDATE body_metrics SET name = 'Thigh (Left)' WHERE name = 'Thigh';
-INSERT OR IGNORE INTO body_metrics (name, unit)
-    SELECT 'Thigh (Right)', unit FROM body_metrics WHERE name = 'Thigh (Left)';
-
-UPDATE body_metrics SET name = 'Calf (Left)' WHERE name = 'Calf';
-INSERT OR IGNORE INTO body_metrics (name, unit)
-    SELECT 'Calf (Right)', unit FROM body_metrics WHERE name = 'Calf (Left)';
-
--- Derived metrics
-INSERT OR IGNORE INTO body_metrics (name, unit, is_derived) VALUES ('Body Fat (Navy)', '%', true);
-INSERT OR IGNORE INTO body_metrics (name, unit, is_derived) VALUES ('FFMI (Navy)', '', true);
-INSERT OR IGNORE INTO body_metrics (name, unit, is_derived) VALUES ('BMI', 'kg/m²', true);
-```
-
-**Required changes to existing backend and frontend**:
-
-*`src-tauri/src/commands/body.rs`*:
-- **`list_metrics`**: add `is_derived` to the `SELECT` and return it. The `Metric` struct in `models.rs` needs a matching `is_derived: bool` field.
-- **`upsert_body_measurement`**: remove the entire post-write block that calls `recompute_body_fat` and `recompute_ffmi` (lines 37–78). The command becomes a simple write with no derived side-effects.
-- **`recompute_body_fat` / `recompute_ffmi`**: delete both functions entirely. The math functions (`body_fat_male`, `body_fat_female`, `calc_ffmi`) are kept — they move to serving on-the-fly reads.
-- **`get_measurements_for_date` / `get_last_measurements_for_date`**: after fetching stored rows, compute and append derived metric values on the fly. For each derived metric whose inputs are present in the fetched set, compute the value and push a synthetic `Measurement` with `id: None` (no DB row). Guard on `settings.estimate_body_fat` for the Navy metrics; BMI only needs weight + height from settings.
-- **`get_measurement_history`**: same appending pattern per date — after grouping each day's stored measurements, compute and append derived values. This means the history view will show Body Fat (Navy) / FFMI / BMI alongside manual entries without any stored rows.
-- **`get_measure_id` / `get_measurement_id`**: delete both helpers (only used by the removed recompute functions).
-
-*`src/lib/body.ts`*:
-- Add `is_derived: boolean` to the `Metric` type.
-- Add `is_derived` to the `Measurement` type (or derive it from `metric.is_derived`) so the frontend can check it without looking at `metric` every time.
-
-*`src/routes/body/[date=date]/+page.svelte`*:
-- In `fetchMeasurements`, `measurementsFilled` is built by merging `metrics` (all metrics) with `measurements` (stored values). Derived metrics will now appear in `measurements` already (computed by the backend), so the merge logic stays the same — but the row needs to be treated differently:
-  - No `–` / `+` buttons
-  - No editable `<input>`, just a display value
-  - No save/delete toggle button
-  - Visually distinct (e.g. muted or labelled "estimated")
-- The `toggle`, `save`, and `deleteMeasurement` functions must guard against `row.metric.is_derived` and no-op if true.
 
 ---
 
@@ -367,7 +286,7 @@ New Rust commands:
 2. ~~**WAL mode + automatic backups**~~ ✓ done
 3. ~~**Create and manage exercises**~~ ✓ done
 4. ~~**Android build**~~ ✓ done
-5. **Body metrics overhaul** — is_derived, FitNotes renames, derived metric rows; must land before import
+5. ~~**Body metrics overhaul**~~ ✓ done — is_derived, FitNotes renames, on-the-fly derived metrics, write guard in upsert
 6. **Body measurements import** — needed to bring in historical data before going mobile
 7. **Android build/test workflow** — reduce iteration friction
 8. **Settings menu** — user profile, dark mode, manual export/restore

@@ -1,6 +1,6 @@
 use crate::models::{Settings, Sex, WeightUnit};
 
-const SCHEMA_VERSION: u32 = 1;
+const SCHEMA_VERSION: u32 = 3;
 
 pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), String> {
     let current = conn
@@ -14,6 +14,18 @@ pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), String> {
     if current < 1 && 1 <= SCHEMA_VERSION {
         migrate_1(conn).map_err(|e| e.to_string())?;
         conn.execute_batch("PRAGMA user_version = 1")
+            .map_err(|e| e.to_string())?;
+    }
+
+    if current < 2 && 2 <= SCHEMA_VERSION {
+        migrate_2(conn).map_err(|e| e.to_string())?;
+        conn.execute_batch("PRAGMA user_version = 2")
+            .map_err(|e| e.to_string())?;
+    }
+
+    if current < 3 && 3 <= SCHEMA_VERSION {
+        migrate_3(conn).map_err(|e| e.to_string())?;
+        conn.execute_batch("PRAGMA user_version = 3")
             .map_err(|e| e.to_string())?;
     }
 
@@ -205,6 +217,40 @@ fn migrate_1(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
+fn migrate_2(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::error::Error>> {
+    conn.execute_batch(
+        "ALTER TABLE body_metrics ADD COLUMN is_derived BOOLEAN NOT NULL DEFAULT false;
+
+        UPDATE body_metrics SET name = 'Upper Arm (Left)' WHERE name = 'Arm';
+        INSERT OR IGNORE INTO body_metrics (name, unit)
+            SELECT 'Upper Arm (Right)', unit FROM body_metrics WHERE name = 'Upper Arm (Left)';
+
+        INSERT OR IGNORE INTO body_metrics (name, unit) VALUES ('Forearm (Left)', 'cm');
+        INSERT OR IGNORE INTO body_metrics (name, unit) VALUES ('Forearm (Right)', 'cm');
+
+        UPDATE body_metrics SET name = 'Thigh (Left)' WHERE name = 'Thigh';
+        INSERT OR IGNORE INTO body_metrics (name, unit)
+            SELECT 'Thigh (Right)', unit FROM body_metrics WHERE name = 'Thigh (Left)';
+
+        UPDATE body_metrics SET name = 'Calf (Left)' WHERE name = 'Calf';
+        INSERT OR IGNORE INTO body_metrics (name, unit)
+            SELECT 'Calf (Right)', unit FROM body_metrics WHERE name = 'Calf (Left)';
+
+        -- Derived metrics
+        UPDATE body_metrics SET name = 'Body Fat (Navy)', is_derived = true WHERE name = 'Body Fat';
+        UPDATE body_metrics SET name = 'FFMI (Navy)', is_derived = true WHERE name = 'FFMI';
+        INSERT OR IGNORE INTO body_metrics (name, unit, is_derived) VALUES ('BMI', 'kg/m²', true);",
+    )?;
+    Ok(())
+}
+
+fn migrate_3(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::error::Error>> {
+    conn.execute_batch(
+        "DELETE FROM body_measurements WHERE measure_id IN (SELECT id FROM body_metrics WHERE is_derived = true);"
+    )?;
+    Ok(())
+}
+
 // Recomputes both PR flags for all sets of an exercise.
 // was_pr_at_time: full chronological pass (Pareto frontier of prior sets).
 // is_current_pr: SQL update checking global dominance.
@@ -266,7 +312,7 @@ pub fn recompute_pr_flags(conn: &rusqlite::Connection, exercise_id: i64) -> Resu
 
 pub fn get_settings(conn: &rusqlite::Connection) -> Result<Settings, String> {
     let mut stmt = conn
-        .prepare("SELECT us.height_cm, us.sex, us.estimate_body_fat, us.dark_mode, us.unit FROM user_settings us")
+        .prepare("SELECT us.height_cm, us.sex, us.dark_mode, us.unit FROM user_settings us")
         .map_err(|e| e.to_string())?;
 
     let mut row = stmt
@@ -275,18 +321,16 @@ pub fn get_settings(conn: &rusqlite::Connection) -> Result<Settings, String> {
                 row.get::<_, i64>(0)?,
                 row.get::<_, String>(1)?,
                 row.get::<_, bool>(2)?,
-                row.get::<_, bool>(3)?,
-                row.get::<_, String>(4)?,
+                row.get::<_, String>(3)?,
             ))
         })
         .map_err(|e| e.to_string())?;
 
     let r = row.next();
     match r {
-        Some(Ok((height, sex, estimate_body_fat, dark_mode, unit))) => Ok(Settings {
+        Some(Ok((height, sex, dark_mode, unit))) => Ok(Settings {
             height,
             sex: Sex::from(sex),
-            estimate_body_fat,
             dark_mode,
             unit: WeightUnit::from(unit),
         }),

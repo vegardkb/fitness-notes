@@ -8,7 +8,7 @@ export type DayMeasurement = {
 export type Measurement = {
   value: number;
   metric: Metric;
-  date: string;
+  date: string | null;
   id: number | null;
 };
 
@@ -16,6 +16,7 @@ export type Metric = {
   name: string;
   unit: string;
   id: number;
+  is_derived: boolean;
 };
 
 export function bodyHrefs(fromDate: string) {

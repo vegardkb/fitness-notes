@@ -61,7 +61,6 @@ pub struct Settings {
     pub height: i64,
     pub unit: WeightUnit,
     pub dark_mode: bool,
-    pub estimate_body_fat: bool,
     pub sex: Sex,
 }
 
@@ -71,19 +70,26 @@ pub struct DayMeasurement {
     pub measurements: Vec<Measurement>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub struct Measurement {
     pub metric: Metric,
     pub value: f64,
-    pub date: String,
-    pub id: i64,
+    pub date: Option<String>,
+    pub id: Option<i64>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub struct Metric {
     pub name: String,
     pub unit: String,
     pub id: i64,
+    pub is_derived: bool,
+}
+
+pub struct DerivedMetricIds {
+    pub bmi: i64,
+    pub bf: i64,
+    pub ffmi: i64,
 }
 
 pub enum Sex {

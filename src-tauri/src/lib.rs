@@ -69,7 +69,8 @@ fn delete_all_data(db: tauri::State<std::sync::Mutex<rusqlite::Connection>>) -> 
     conn.execute_batch(
         "DELETE FROM sets;
          DELETE FROM workout_exercises;
-         DELETE FROM workouts;",
+         DELETE FROM workouts;
+         DELETE FROM body_measurements;",
     )
     .map_err(|e| e.to_string())
 }
