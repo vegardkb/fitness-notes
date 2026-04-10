@@ -260,9 +260,7 @@ pub fn list_metrics(
         })
         .map_err(|e| e.to_string())?;
 
-    let out = rows.map(|r| r.map_err(|e| e.to_string())).collect();
-
-    out
+    rows.map(|r| r.map_err(|e| e.to_string())).collect()
 }
 
 fn calculate_derived_metrics(
@@ -315,47 +313,37 @@ fn calculate_derived_metrics(
             _ => None,
         },
     };
-    match bf {
-        Some(bf) => {
+    if let Some(bf) = bf {
+        derived_result.push(Measurement {
+            metric: Metric {
+                name: "Body Fat (Navy)".to_string(),
+                unit: "%".to_string(),
+                id: derived_ids.bf,
+                is_derived: true,
+            },
+            value: bf,
+            date: get_derived_metric_date(result, "Body Fat (Navy)", &settings.sex),
+            id: None,
+        });
+        if let Some(weight) = weight {
+            let ffmi = calc_ffmi(bf, weight, height);
             derived_result.push(Measurement {
                 metric: Metric {
-                    name: "Body Fat (Navy)".to_string(),
-                    unit: "%".to_string(),
-                    id: derived_ids.bf,
+                    name: "FFMI (Navy)".to_string(),
+                    unit: "kg/m²".to_string(),
+                    id: derived_ids.ffmi,
                     is_derived: true,
                 },
-                value: bf,
-                date: get_derived_metric_date(result, "Body Fat (Navy)", &settings.sex),
+                value: ffmi,
+                date: get_derived_metric_date(result, "FFMI (Navy)", &settings.sex),
                 id: None,
             });
-            match weight {
-                Some(weight) => {
-                    let ffmi = calc_ffmi(bf, weight, height);
-                    derived_result.push(Measurement {
-                        metric: Metric {
-                            name: "FFMI (Navy)".to_string(),
-                            unit: "kg/m²".to_string(),
-                            id: derived_ids.ffmi,
-                            is_derived: true,
-                        },
-                        value: ffmi,
-                        date: get_derived_metric_date(result, "FFMI (Navy)", &settings.sex),
-                        id: None,
-                    });
-                }
-                None => (),
-            }
         }
-        None => (),
     }
     derived_result
 }
 
-fn get_derived_metric_date(
-    result: &Vec<Measurement>,
-    metric_name: &str,
-    sex: &Sex,
-) -> Option<String> {
+fn get_derived_metric_date(result: &[Measurement], metric_name: &str, sex: &Sex) -> Option<String> {
     let measurement = match metric_name {
         "BMI" => result
             .iter()

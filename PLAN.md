@@ -6,7 +6,7 @@
 - **Calendar** (`/calendar`): Month view with activity dots, navigates to feed date
 - **Exercise tracker** (`/exercise/[id]/[date]`): Full CRUD for sets, PR tracking, history, graph (estimated 1RM), PRs table (nRM viewer)
 - **Body tracker** (`/body/[date]`): Log measurements per metric; derived metrics (BMI, Body Fat (Navy), FFMI (Navy)) computed on the fly from stored inputs, never written to DB; history view. `is_derived` flag in `body_metrics` controls read-only rendering. Derived metric dates reflect the most recently updated input.
-- **Settings** (`/settings`): FitNotes CSV import wizard, delete all data
+- **Settings** (`/settings`): FitNotes exercise CSV import wizard, FitNotes Body Tracker CSV import wizard (resolve unknowns: create/map/skip), delete all data
 - **Light/dark mode**: CSS variables defined; `dark_mode` stored in DB but not yet wired to the UI
 - **Exercise/category management** (`/exercises/[date]`): Category → exercise drill-down, full CRUD (create, rename, delete, merge) for both categories and exercises via inline inputs and ⋯ context menus. Merge moves all sets/history to the target and recomputes PRs. Errors surface as toasts.
 - **Migration infrastructure**: `run_migrations()` in `database.rs` with downgrade guard and per-version functions. WAL mode enabled at startup. Automatic daily backups (last 14 kept) on every launch.
@@ -44,22 +44,6 @@ v5: ALTER TABLE user_settings ADD COLUMN use_seasons BOOLEAN DEFAULT true
 v6: ALTER TABLE sets ADD COLUMN is_season_pr BOOLEAN DEFAULT false
 v7: CREATE TABLE templates / template_exercises
 ```
-
----
-
-### 2. Body measurements import
-
-FitNotes exports body tracker data as CSV (exact column format TBD — inspect a real export before implementing; likely `Date, Measurement, Value, Unit`). Import follows the same multi-step wizard pattern as the exercise import.
-
-**Commands**:
-- `parse_body_measurements_csv(csv_text) → { rows: Vec<ParsedBodyRow>, unknown_metrics: Vec<String> }`
-- `import_body_measurement_rows(rows: Vec<ResolvedBodyRow>) → { imported, skipped }`
-  - Uses `INSERT OR IGNORE` to skip duplicate (date, metric_id) pairs
-
-**Frontend** — same phase-based state machine as the exercise import in `src/routes/settings/+page.svelte`:
-1. File picker → parse
-2. Resolve unknowns: for each unrecognized metric name, user maps it to an existing body metric or skips it
-3. Preview count → confirm → import → result
 
 ---
 
@@ -287,7 +271,7 @@ New Rust commands:
 3. ~~**Create and manage exercises**~~ ✓ done
 4. ~~**Android build**~~ ✓ done
 5. ~~**Body metrics overhaul**~~ ✓ done — is_derived, FitNotes renames, on-the-fly derived metrics, write guard in upsert
-6. **Body measurements import** — needed to bring in historical data before going mobile
+6. ~~**Body measurements import**~~ ✓ done
 7. **Android build/test workflow** — reduce iteration friction
 8. **Settings menu** — user profile, dark mode, manual export/restore
 9. **Complete body tracker** (graph + PRs)

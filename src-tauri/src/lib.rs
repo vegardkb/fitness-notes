@@ -8,7 +8,10 @@ use crate::commands::exercises::{
     list_exercise_categories, list_exercises_in_category, merge_category_into_existing,
     merge_exercise_into_existing, rename_category, rename_exercise,
 };
-use crate::commands::import::{import_fitnotes_rows, parse_fitnotes_csv};
+use crate::commands::import::{
+    import_body_measurement_rows, import_fitnotes_rows, parse_body_measurements_csv,
+    parse_fitnotes_csv,
+};
 use crate::commands::sets::{delete_set, reorder_exercises, reorder_sets, upsert_set};
 use crate::commands::workouts::{get_active_dates, get_workout_for_date, get_workouts_for_range};
 
@@ -51,6 +54,8 @@ pub fn run() {
             get_workouts_for_range,
             parse_fitnotes_csv,
             import_fitnotes_rows,
+            parse_body_measurements_csv,
+            import_body_measurement_rows,
             delete_all_data,
             upsert_body_measurement,
             delete_body_measurement,
@@ -110,7 +115,7 @@ fn backup_db(
     // Keep the 14 most recent backups, delete the rest
     let mut entries: Vec<_> = std::fs::read_dir(&backups_dir)?
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map_or(false, |ext| ext == "db"))
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "db"))
         .collect();
     entries.sort_by_key(|e| e.file_name());
     for entry in entries.iter().take(entries.len().saturating_sub(14)) {

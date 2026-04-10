@@ -22,7 +22,7 @@ pub fn parse_fitnotes_csv(
         known.insert(name, id);
     }
 
-    let mut parsed: Vec<ParsedRow> = Vec::new();
+    let mut parsed: Vec<ExerciseRow> = Vec::new();
     let mut unknowns_seen: std::collections::HashSet<String> = std::collections::HashSet::new();
     let mut unknown_exercises: Vec<UnknownExercise> = Vec::new();
 
@@ -59,7 +59,7 @@ pub fn parse_fitnotes_csv(
                 csv_category: category_name.clone(),
             });
         }
-        parsed.push(ParsedRow {
+        parsed.push(ExerciseRow {
             date,
             exercise_name,
             category_name,
@@ -76,8 +76,77 @@ pub fn parse_fitnotes_csv(
 }
 
 #[tauri::command]
+pub fn parse_body_measurements_csv(
+    csv: String,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<ParseBodyResult, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+
+    let mut known: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+    let mut stmt = conn
+        .prepare("SELECT id, name FROM body_metrics")
+        .map_err(|e| e.to_string())?;
+    let rows_iter = stmt
+        .query_map([], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|e| e.to_string())?;
+    for r in rows_iter {
+        let (id, name) = r.map_err(|e| e.to_string())?;
+        known.insert(name, id);
+    }
+
+    let mut parsed: Vec<BodyRow> = Vec::new();
+    let mut unknowns_seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut unknown_metrics: Vec<String> = Vec::new();
+
+    for (i, line) in csv.lines().enumerate() {
+        if i == 0 {
+            continue;
+        }
+        let cols: Vec<&str> = line.split(',').collect();
+        if cols.len() < 5 {
+            continue;
+        }
+        let date = cols[0].trim().to_string();
+        let measurement = cols[2].trim().to_string();
+        let value_raw: f64 = match cols[3].trim().parse() {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let unit = cols[4].trim().to_string();
+
+        let value = if unit == "lbs" || unit == "lb" {
+            value_raw * 0.453592
+        } else {
+            value_raw
+        };
+        if date.is_empty() || measurement.is_empty() {
+            continue;
+        }
+
+        let metric_id = known.get(&measurement).copied();
+        if metric_id.is_none() && unknowns_seen.insert(measurement.clone()) {
+            unknown_metrics.push(measurement.clone());
+        }
+        parsed.push(BodyRow {
+            date,
+            measurement,
+            value,
+            unit,
+            metric_id,
+        });
+    }
+
+    Ok(ParseBodyResult {
+        rows: parsed,
+        unknown_metrics,
+    })
+}
+
+#[tauri::command]
 pub fn import_fitnotes_rows(
-    rows: Vec<ResolvedRow>,
+    rows: Vec<ExerciseRow>,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<ImportResult, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
@@ -192,8 +261,90 @@ pub fn import_fitnotes_rows(
     })
 }
 
-#[derive(Serialize)]
-struct ParsedRow {
+#[tauri::command]
+pub fn import_body_measurement_rows(
+    rows: Vec<BodyRow>,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<BodyImportResult, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+
+    let mut name_to_id: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+    let mut affected_dates: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut measurements_imported = 0;
+
+    for row in rows {
+        // Resolve metric_id: use existing if available, insert if not
+        let metric_id = if let Some(id) = row.metric_id {
+            id
+        } else if let Some(&id) = name_to_id.get(&row.measurement) {
+            id
+        } else {
+            let unit = match row.unit.as_str() {
+                "kg" | "kgs" | "lbs" | "lb" => "kg",
+                "cm" => "cm",
+                "%" => "%",
+                _ => continue,
+            };
+            conn.execute(
+                "INSERT OR IGNORE INTO body_metrics (name, unit) VALUES (?1, ?2)",
+                rusqlite::params![row.measurement, unit],
+            )
+            .map_err(|e| e.to_string())?;
+            let m_id: i64 = conn
+                .query_row(
+                    "SELECT id FROM body_metrics WHERE name = ?1",
+                    rusqlite::params![row.measurement],
+                    |r| r.get(0),
+                )
+                .map_err(|e| e.to_string())?;
+            name_to_id.insert(row.measurement.clone(), m_id);
+            m_id
+        };
+
+        // Check for existing measurement for this date and metric
+        let num_rows: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM body_measurements WHERE date = ?1 AND measure_id = ?2",
+                rusqlite::params![row.date, metric_id],
+                |r| r.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        if num_rows > 0 {
+            continue;
+        }
+
+        // Check if metric is derived
+        let derived: bool = conn
+            .query_row(
+                "SELECT is_derived FROM body_metrics WHERE id = ?1",
+                rusqlite::params![metric_id],
+                |r| r.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        if derived {
+            continue;
+        }
+
+        // Insert new measurement
+        conn.execute(
+            "INSERT INTO body_measurements (date, value, measure_id)
+            VALUES (?1, ?2, ?3)",
+            rusqlite::params![row.date, row.value, metric_id],
+        )
+        .map_err(|e| e.to_string())?;
+        measurements_imported += 1;
+        affected_dates.insert(row.date);
+    }
+    let days_touched = affected_dates.len() as i64;
+
+    Ok(BodyImportResult {
+        measurements_imported,
+        days_touched,
+    })
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ExerciseRow {
     date: String,
     exercise_name: String,
     category_name: String,
@@ -210,22 +361,33 @@ struct UnknownExercise {
 
 #[derive(Serialize)]
 pub struct ParseResult {
-    rows: Vec<ParsedRow>,
+    rows: Vec<ExerciseRow>,
     unknown_exercises: Vec<UnknownExercise>,
-}
-
-#[derive(Deserialize)]
-pub struct ResolvedRow {
-    date: String,
-    exercise_id: Option<i64>,
-    exercise_name: String,
-    category_name: String,
-    weight_kg: f64,
-    reps: i64,
 }
 
 #[derive(Serialize)]
 pub struct ImportResult {
     sets_imported: i64,
     workouts_touched: i64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct BodyRow {
+    date: String,
+    measurement: String,
+    value: f64,
+    unit: String,
+    metric_id: Option<i64>,
+}
+
+#[derive(Serialize)]
+pub struct ParseBodyResult {
+    rows: Vec<BodyRow>,
+    unknown_metrics: Vec<String>,
+}
+
+#[derive(Serialize)]
+pub struct BodyImportResult {
+    measurements_imported: i64,
+    days_touched: i64,
 }

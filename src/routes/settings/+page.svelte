@@ -3,7 +3,7 @@
     import { invoke } from "@tauri-apps/api/core";
     import { ArrowLeft, ChevronRight } from "lucide-svelte";
 
-    type ParsedRow = {
+    type ExerciseRow = {
         date: string;
         exercise_name: string;
         category_name: string;
@@ -11,45 +11,71 @@
         reps: number;
         exercise_id: number | null;
     };
+    type BodyRow = {
+        date: string;
+        measurement: string;
+        value: number;
+        unit: string;
+        metric_id: number | null;
+    };
+
     type UnknownExercise = { csv_name: string; csv_category: string };
     type ParseResult = {
-        rows: ParsedRow[];
+        rows: ExerciseRow[];
         unknown_exercises: UnknownExercise[];
+    };
+    type ParseBodyResult = {
+        rows: BodyRow[];
+        unknown_metrics: string[];
     };
     type Resolution =
         | { action: "create" }
-        | { action: "map"; exercise_id: number; exercise_name: string };
-    type ResolvedRow = {
-        date: string;
-        exercise_id: number | null;
-        exercise_name: string;
-        category_name: string;
-        weight_kg: number;
-        reps: number;
-    };
+        | { action: "map"; id: number; name: string }
+        | { action: "skip" };
+
     type ImportResult = { sets_imported: number; workouts_touched: number };
+    type BodyImportResult = {
+        measurements_imported: number;
+        days_touched: number;
+    };
     type Exercise = { id: number; name: string };
+    type Metric = { id: number; name: string; unit: string; is_derived: boolean };
 
     type Phase =
         | { name: "idle" }
         | {
               name: "resolving";
-              rows: ParsedRow[];
+              rows: ExerciseRow[];
               unknowns: UnknownExercise[];
               resolutions: Record<string, Resolution>;
           }
         | {
               name: "confirming";
-              resolvedRows: ResolvedRow[];
+              resolvedRows: ExerciseRow[];
               rowCount: number;
               dateCount: number;
           }
         | { name: "importing" }
         | { name: "done"; result: ImportResult }
-        | { name: "error"; message: string };
+        | { name: "error"; message: string }
+        | {
+              name: "body_resolving";
+              rows: BodyRow[];
+              unknowns: string[];
+              resolutions: Record<string, Resolution>;
+          }
+        | {
+              name: "body_confirming";
+              resolvedRows: BodyRow[];
+              rowCount: number;
+              dateCount: number;
+          }
+        | { name: "body_importing" }
+        | { name: "body_done"; result: BodyImportResult };
 
     let phase = $state<Phase>({ name: "idle" });
     let fileInput = $state<HTMLInputElement>();
+    let bodyFileInput = $state<HTMLInputElement>();
 
     let confirmingDelete = $state(false);
 
@@ -64,41 +90,57 @@
     let pickerCategories = $state<Category[]>([]);
     let pickerExercises = $state<Exercise[]>([]);
 
+    // Inline body metric picker state
+    let bodyPickingFor = $state<string | null>(null);
+    let bodyMetrics = $state<Metric[]>([]);
+
     function buildResolvedRows(
-        rows: ParsedRow[],
+        rows: ExerciseRow[],
         resolutions: Record<string, Resolution>,
-    ): ResolvedRow[] {
+    ): ExerciseRow[] {
         return rows.map((row) => {
             if (row.exercise_id !== null) {
-                return {
-                    date: row.date,
-                    exercise_id: row.exercise_id,
-                    exercise_name: row.exercise_name,
-                    category_name: row.category_name,
-                    weight_kg: row.weight_kg,
-                    reps: row.reps,
-                };
+                return row;
             }
             const res = resolutions[row.exercise_name];
-            if (res?.action === "map") {
+            if (res.action === "map") {
                 return {
-                    date: row.date,
-                    exercise_id: res.exercise_id,
-                    exercise_name: res.exercise_name,
+                    ...row,
+                    exercise_id: res.id,
+                    exercise_name: res.name,
                     category_name: "",
-                    weight_kg: row.weight_kg,
-                    reps: row.reps,
                 };
             }
             return {
-                date: row.date,
+                ...row,
                 exercise_id: null,
-                exercise_name: row.exercise_name,
-                category_name: row.category_name,
-                weight_kg: row.weight_kg,
-                reps: row.reps,
             };
         });
+    }
+
+    function buildResolvedBodyRows(
+        rows: BodyRow[],
+        resolutions: Record<string, Resolution>,
+    ): BodyRow[] {
+        return rows
+            .map((row) => {
+                if (row.metric_id !== null) {
+                    return row;
+                }
+                const res = resolutions[row.measurement];
+                if (res.action === "map") {
+                    return {
+                        ...row,
+                        measurement: res.name,
+                        metric_id: res.id,
+                    };
+                } else if (res.action === "skip") {
+                    return undefined;
+                } else {
+                    return { ...row, metric_id: null };
+                }
+            })
+            .filter((row) => row !== undefined);
     }
 
     async function handleFile(e: Event) {
@@ -138,6 +180,44 @@
         }
     }
 
+    async function handleBodyFile(event: Event) {
+        const file = (event.target as HTMLInputElement).files?.[0];
+        if (!file) return;
+        const text = await file.text();
+        if (bodyFileInput) bodyFileInput.value = "";
+        try {
+            const result = await invoke<ParseBodyResult>(
+                "parse_body_measurements_csv",
+                {
+                    csv: text,
+                },
+            );
+            if (result.unknown_metrics.length === 0) {
+                const resolvedRows = result.rows;
+                const dateCount = new Set(resolvedRows.map((r) => r.date)).size;
+                phase = {
+                    name: "body_confirming",
+                    resolvedRows,
+                    rowCount: resolvedRows.length,
+                    dateCount,
+                };
+            } else {
+                const resolutions: Record<string, Resolution> = {};
+                for (const u of result.unknown_metrics) {
+                    resolutions[u] = { action: "create" };
+                }
+                phase = {
+                    name: "body_resolving",
+                    rows: result.rows,
+                    unknowns: result.unknown_metrics,
+                    resolutions,
+                };
+            }
+        } catch (err) {
+            phase = { name: "error", message: String(err) };
+        }
+    }
+
     function continueToConfirm() {
         if (phase.name !== "resolving") return;
         const resolvedRows = buildResolvedRows(phase.rows, phase.resolutions);
@@ -167,6 +247,58 @@
     function reset() {
         phase = { name: "idle" };
         pickingFor = null;
+        bodyPickingFor = null;
+    }
+
+    async function startBodyPicking(metricName: string) {
+        if (bodyPickingFor === metricName) {
+            bodyPickingFor = null;
+            return;
+        }
+        bodyPickingFor = metricName;
+        bodyMetrics = await invoke<Metric[]>("list_metrics");
+    }
+
+    function setBodyResolution(metricName: string, res: Resolution) {
+        if (phase.name !== "body_resolving") return;
+        phase.resolutions = { ...phase.resolutions, [metricName]: res };
+        if (res.action !== "map") bodyPickingFor = null;
+    }
+
+    function bodyPickerSelectMetric(m: Metric) {
+        if (phase.name !== "body_resolving" || !bodyPickingFor) return;
+        phase.resolutions = {
+            ...phase.resolutions,
+            [bodyPickingFor]: { action: "map", id: m.id, name: m.name },
+        };
+        bodyPickingFor = null;
+    }
+
+    function continueBodyToConfirm() {
+        if (phase.name !== "body_resolving") return;
+        const resolvedRows = buildResolvedBodyRows(phase.rows, phase.resolutions);
+        const dateCount = new Set(resolvedRows.map((r) => r.date)).size;
+        phase = {
+            name: "body_confirming",
+            resolvedRows,
+            rowCount: resolvedRows.length,
+            dateCount,
+        };
+    }
+
+    async function confirmBodyImport() {
+        if (phase.name !== "body_confirming") return;
+        const rows = phase.resolvedRows;
+        phase = { name: "body_importing" };
+        try {
+            const result = await invoke<BodyImportResult>(
+                "import_body_measurement_rows",
+                { rows },
+            );
+            phase = { name: "body_done", result };
+        } catch (err) {
+            phase = { name: "error", message: String(err) };
+        }
     }
 
     async function startPicking(csvName: string) {
@@ -194,8 +326,8 @@
         if (phase.name !== "resolving" || !pickingFor) return;
         phase.resolutions[pickingFor] = {
             action: "map",
-            exercise_id: ex.id,
-            exercise_name: ex.name,
+            id: ex.id,
+            name: ex.name,
         };
         // Svelte 5: trigger reactivity on the record
         phase.resolutions = { ...phase.resolutions };
@@ -213,7 +345,9 @@
 
 <div class="page">
     <div class="history-header">
-        <a class="back-btn" href="/"><ArrowLeft size={18} strokeWidth={1.5} /></a>
+        <a class="back-btn" href="/"
+            ><ArrowLeft size={18} strokeWidth={1.5} /></a
+        >
         <h1>Settings</h1>
     </div>
 
@@ -229,12 +363,28 @@
                     Import CSV
                 </button>
             </div>
+            <div class="settings-row">
+                <span>FitNotes Body Tracker CSV</span>
+                <button
+                    class="add-btn-inline"
+                    onclick={() => bodyFileInput?.click()}
+                >
+                    Import CSV
+                </button>
+            </div>
         </div>
         <input
             type="file"
             accept=".csv,text/csv,text/comma-separated-values,application/csv,application/vnd.ms-excel,text/plain"
             bind:this={fileInput}
             onchange={handleFile}
+            style="display:none"
+        />
+        <input
+            type="file"
+            accept=".csv,text/csv,text/comma-separated-values,application/csv,application/vnd.ms-excel,text/plain"
+            bind:this={bodyFileInput}
+            onchange={handleBodyFile}
             style="display:none"
         />
 
@@ -315,8 +465,7 @@
                             Map to existing
                         </button>
                         {#if res.action === "map"}
-                            <span class="import-mapped-label"
-                                >→ {res.exercise_name}</span
+                            <span class="import-mapped-label">→ {res.name}</span
                             >
                         {/if}
                     </div>
@@ -346,7 +495,10 @@
                                         class="back-btn"
                                         onclick={() =>
                                             (pickerView = "categories")}
-                                        ><ArrowLeft size={18} strokeWidth={1.5} /></button
+                                        ><ArrowLeft
+                                            size={18}
+                                            strokeWidth={1.5}
+                                        /></button
                                     >
                                     <p class="import-unknown-meta">
                                         Select exercise
@@ -369,7 +521,12 @@
                 </div>
             {/each}
         </div>
-        <button class="add-btn" onclick={continueToConfirm} style="display:flex;align-items:center;justify-content:center;gap:0.4rem;">Continue <ChevronRight size={16} strokeWidth={1.5} /></button>
+        <button
+            class="add-btn"
+            onclick={continueToConfirm}
+            style="display:flex;align-items:center;justify-content:center;gap:0.4rem;"
+            >Continue <ChevronRight size={16} strokeWidth={1.5} /></button
+        >
         <button class="delete-btn" onclick={reset}>Cancel</button>
     {:else if phase.name === "confirming"}
         <div class="import-summary">
@@ -394,5 +551,98 @@
             {phase.message}
         </div>
         <button class="add-btn" onclick={reset}>Try again</button>
+    {:else if phase.name === "body_resolving"}
+        <p class="settings-section-title">
+            {phase.unknowns.length} metric{phase.unknowns.length === 1
+                ? ""
+                : "s"} not recognized
+        </p>
+        <div class="import-unknown-list">
+            {#each phase.unknowns as u}
+                {@const res = phase.resolutions[u]}
+                <div
+                    class="import-unknown-item"
+                    class:is-picking={bodyPickingFor === u}
+                >
+                    <div class="import-unknown-name">{u}</div>
+                    <div class="import-unknown-actions">
+                        <button
+                            class="range-pill"
+                            class:range-pill--active={res.action === "create"}
+                            onclick={() =>
+                                setBodyResolution(u, { action: "create" })}
+                        >
+                            Create new
+                        </button>
+                        <button
+                            class="range-pill"
+                            class:range-pill--active={res.action === "map" ||
+                                bodyPickingFor === u}
+                            onclick={() => startBodyPicking(u)}
+                        >
+                            Map to existing
+                        </button>
+                        <button
+                            class="range-pill"
+                            class:range-pill--active={res.action === "skip"}
+                            onclick={() =>
+                                setBodyResolution(u, { action: "skip" })}
+                        >
+                            Skip
+                        </button>
+                        {#if res.action === "map"}
+                            <span class="import-mapped-label"
+                                >→ {res.name}</span
+                            >
+                        {/if}
+                    </div>
+                    {#if bodyPickingFor === u}
+                        <div class="import-picker">
+                            <p class="import-unknown-meta">Select metric</p>
+                            <div class="list">
+                                {#each bodyMetrics.filter((m) => !m.is_derived) as m}
+                                    <button
+                                        class="list-item"
+                                        onclick={() =>
+                                            bodyPickerSelectMetric(m)}
+                                    >
+                                        {m.name}
+                                        <span class="import-unknown-meta"
+                                            >{m.unit}</span
+                                        >
+                                    </button>
+                                {/each}
+                            </div>
+                        </div>
+                    {/if}
+                </div>
+            {/each}
+        </div>
+        <button
+            class="add-btn"
+            onclick={continueBodyToConfirm}
+            style="display:flex;align-items:center;justify-content:center;gap:0.4rem;"
+            >Continue <ChevronRight size={16} strokeWidth={1.5} /></button
+        >
+        <button class="delete-btn" onclick={reset}>Cancel</button>
+    {:else if phase.name === "body_confirming"}
+        <div class="import-summary">
+            Import <strong>{phase.rowCount} measurements</strong> across
+            <strong>{phase.dateCount} dates</strong>?
+        </div>
+        <button class="add-btn" onclick={confirmBodyImport}
+            >Confirm import</button
+        >
+        <button class="delete-btn" onclick={reset}>Cancel</button>
+    {:else if phase.name === "body_importing"}
+        <p class="empty">Importing…</p>
+    {:else if phase.name === "body_done"}
+        <div class="import-summary">
+            Imported
+            <strong>{phase.result.measurements_imported} measurements</strong>
+            across
+            <strong>{phase.result.days_touched} days</strong>.
+        </div>
+        <button class="add-btn" onclick={reset}>Import another</button>
     {/if}
 </div>
