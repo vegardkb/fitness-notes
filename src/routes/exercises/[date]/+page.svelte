@@ -95,7 +95,10 @@
     async function createExercise(name: string) {
         if (view.name !== "exercisesInCategory") return;
         try {
-            await invoke("create_exercise", { name, categoryId: view.category.id });
+            await invoke("create_exercise", {
+                name,
+                categoryId: view.category.id,
+            });
             exercisesInCategory = await invoke("list_exercises_in_category", {
                 categoryId: view.category.id,
             });
@@ -137,7 +140,12 @@
     }
 
     async function confirmExerciseMerge() {
-        if (!mergeExerciseFrom || !mergeExerciseTo || view.name !== "exercisesInCategory") return;
+        if (
+            !mergeExerciseFrom ||
+            !mergeExerciseTo ||
+            view.name !== "exercisesInCategory"
+        )
+            return;
         try {
             await invoke("merge_exercise_into_existing", {
                 fromId: mergeExerciseFrom.id,
@@ -175,10 +183,10 @@
         <div class="header">
             <button
                 class="back-btn"
-                onclick={() => goto(date ? `/?date=${date}` : "/")}
-            >←</button>
+                onclick={() => goto(date ? `/?date=${date}` : "/")}>←</button
+            >
             <h1>Select category</h1>
-            <button class="new-btn" onclick={() => (creating = true)}>
+            <button class="back-btn" onclick={() => (creating = true)}>
                 <PlusIcon />
             </button>
         </div>
@@ -198,10 +206,10 @@
                 onclick={() => {
                     view = { name: "categories" };
                     creating = false;
-                }}
-            >←</button>
+                }}>←</button
+            >
             <h1>{view.category.name}</h1>
-            <button class="new-btn" onclick={() => (creating = true)}>
+            <button class="back-btn" onclick={() => (creating = true)}>
                 <PlusIcon />
             </button>
         </div>
@@ -237,12 +245,12 @@
         {/each}
     </div>
     <div class="form-row">
-        <button
-            class="update-btn"
-            disabled={!mergeTo}
-            onclick={confirmMerge}
-        >Merge</button>
-        <button class="delete-btn" onclick={() => mergeDialog?.close()}>Cancel</button>
+        <button class="update-btn" disabled={!mergeTo} onclick={confirmMerge}
+            >Merge</button
+        >
+        <button class="delete-btn" onclick={() => mergeDialog?.close()}
+            >Cancel</button
+        >
     </div>
 </dialog>
 
@@ -266,8 +274,10 @@
         <button
             class="update-btn"
             disabled={!mergeExerciseTo}
-            onclick={confirmExerciseMerge}
-        >Merge</button>
-        <button class="delete-btn" onclick={() => mergeExerciseDialog?.close()}>Cancel</button>
+            onclick={confirmExerciseMerge}>Merge</button
+        >
+        <button class="delete-btn" onclick={() => mergeExerciseDialog?.close()}
+            >Cancel</button
+        >
     </div>
 </dialog>

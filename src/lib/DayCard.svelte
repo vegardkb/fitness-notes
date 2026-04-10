@@ -4,7 +4,12 @@
     import { onMount } from "svelte";
     import { dndzone } from "svelte-dnd-action";
     import { formatDate } from "$lib/date";
-    import { GripVertical, ChevronRight, PersonStanding } from "lucide-svelte";
+    import {
+        GripVertical,
+        ChevronRight,
+        PersonStanding,
+        Dumbbell,
+    } from "lucide-svelte";
     import type { ExerciseWithSets } from "$lib/exercise";
     import { formatWeight } from "$lib/exercise";
 
@@ -48,12 +53,11 @@
         <span class="day-label">{formatDate(date)}</span>
         <div class="day-card-btns">
             <button class="back-btn" onclick={() => goto(`/body/${date}`)}>
-                <PersonStanding size={18} strokeWidth={1.5} />
+                <PersonStanding size={18} strokeWidth={2} />
             </button>
-            <button
-                class="add-btn-inline"
-                onclick={() => goto(`/exercises/${date}`)}>+ Add</button
-            >
+            <button class="back-btn" onclick={() => goto(`/exercises/${date}`)}>
+                <Dumbbell size={18} strokeWidth={1.5} />
+            </button>
         </div>
     </div>
 
