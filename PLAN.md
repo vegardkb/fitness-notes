@@ -91,7 +91,7 @@ v4: Schema refactor — recreate workouts, workout_exercises, sets (see section 
 v5: ALTER TABLE user_settings ADD COLUMN season_start TEXT DEFAULT '01-01'
 v6: ALTER TABLE user_settings ADD COLUMN use_seasons BOOLEAN DEFAULT true
 v7: ALTER TABLE sets ADD COLUMN is_season_pr BOOLEAN DEFAULT false
-v8: CREATE TABLE templates / template_exercises
+v8: CREATE TABLE templates / template_exercises / planned_sets
 ```
 
 ---
@@ -259,12 +259,42 @@ CREATE TABLE template_exercises (
 - `save_day_as_template(date, name) → i64` — snapshot current workout_exercises for a date
 - `list_templates() → Vec<{id, name, exercises[]}>`
 - `delete_template(id)`
-- `apply_template(template_id, date)` — adds all template exercises to the date, then inserts one pre-filled set per exercise using the last logged weight/reps for that exercise (fallback: 0 kg, 5 reps if no history)
+- `apply_template(template_id, date)` — creates `workout_exercises` rows for each template exercise and populates `planned_sets` (see below) using last logged weight/reps as targets (fallback: `weight=null, reps=null`)
 
 **Frontend**:
 - New route `src/routes/templates/` — list, delete, create from current day
 - New `src/lib/TemplateModal.svelte` — picker modal, similar to `AddExerciseModal`
 - `src/lib/DayCard.svelte` — "Use template" button alongside "Add exercise"
+- Exercise page: show planned and actual sets side by side; if no `planned_sets` exist for the exercise instance, render as today
+
+---
+
+#### Planned sets
+
+Templates apply by populating `planned_sets`, not by creating ghost rows in `sets`. The `sets` table remains exclusively actual logged performance — PR logic and history are never contaminated.
+
+**DB changes** (migration v8, alongside templates):
+```sql
+CREATE TABLE planned_sets (
+    id                  INTEGER PRIMARY KEY,
+    workout_exercise_id INTEGER NOT NULL REFERENCES workout_exercises(id),
+    set_order           INTEGER NOT NULL,
+    weight_kg           REAL,    -- nullable: weight not yet decided
+    reps                INTEGER, -- nullable: AMRAP or open-ended
+    notes               TEXT     -- qualitative guidance: "RPE 8", "AMRAP", "~80%"
+);
+```
+
+**Properties**:
+- Per-set granularity: each planned set is its own row, so pyramid sets (60×8, 80×6, 100×4) and wave loading are representable without any hacks
+- Partial plans are valid: a row can have `reps` but no `weight`, or just a `notes` string
+- Applying a template creates `planned_sets` rows; manually planning a session creates them directly
+- On the exercise page, planned set N is matched against actual set N; extra actual sets (exceeded the plan) and missing actual sets (didn't finish) are shown as gaps
+
+**New commands**:
+- `upsert_planned_set(id, workout_exercise_id, set_order, weight_kg, reps, notes)`
+- `delete_planned_set(id)`
+- `get_planned_sets(workout_exercise_id) → Vec<PlannedSet>`
 
 ---
 
@@ -303,6 +333,9 @@ New route `/analysis`. Three sections:
 **C. Trend lines** — linear regression overlay on any time-series chart, computed client-side (least-squares on already-fetched data, no new backend command needed).
 
 Add an analysis icon to the header nav in `src/routes/+layout.svelte`.
+
+Possible interesting analysis:
+- Pareto frontier (reps vs highest weight for rep count), comparing exercises and season could be interesting, as well as the shape of the curve. 
 
 ---
 
