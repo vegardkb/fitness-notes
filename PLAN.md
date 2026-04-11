@@ -10,23 +10,71 @@
 - **Light/dark mode**: CSS variables defined; `dark_mode` stored in DB but not yet wired to the UI
 - **Exercise/category management** (`/exercises/[date]`): Category → exercise drill-down, full CRUD (create, rename, delete, merge) for both categories and exercises via inline inputs and ⋯ context menus. Merge moves all sets/history to the target and recomputes PRs. Errors surface as toasts.
 - **Migration infrastructure**: `run_migrations()` in `database.rs` with downgrade guard and per-version functions. WAL mode enabled at startup. Automatic daily backups (last 14 kept) on every launch.
-- **Android build**: App runs on Android via Tauri. Touch targets, DnD, viewport, and file picker verified. Build via `pnpm tauri android build`; iOS deferred.
+- **Android build & deploy**: App runs on Android via Tauri. Touch targets, DnD, viewport, and file picker verified. Daily iteration via `pnpm tauri android dev` (USB, HMR). Release builds signed via keystore env vars; `deploy.sh` builds and installs in one step.
 
 ---
 
 ## Database schema (current)
 
 ```sql
-categories          -- exercise categories (Abs, Back, Biceps, ...)
-exercises           -- exercise library (name, category_id)
-workouts            -- one row per date
-workout_exercises   -- which exercises appear on a date, with order
-sets                -- individual sets (weight_kg, reps, was_pr_at_time, is_current_pr)
+categories (
+    id      integer primary key,
+    name    text not null unique
+)
 
-body_metrics        -- metric definitions (name, unit, is_derived); derived metrics have no rows in body_measurements
-body_measurements   -- logged values (date, metric_id, value); never contains rows for derived metrics
+exercises (
+    id          integer primary key,
+    name        text not null unique,
+    category_id integer not null references categories(id)
+)
 
-user_settings       -- single row: height_cm, unit, dark_mode, estimate_body_fat, sex
+workouts (
+    id   integer primary key,
+    date text not null unique
+)
+
+workout_exercises (
+    id             integer primary key,
+    workout_id     integer not null references workouts(id),
+    exercise_id    integer not null references exercises(id),
+    exercise_order integer not null,
+    unique (workout_id, exercise_id)
+)
+
+sets (
+    id              integer primary key,
+    workout_id      integer not null references workouts(id),
+    exercise_id     integer not null references exercises(id),
+    set_order       integer not null,
+    weight_kg       real not null,
+    reps            integer not null,
+    notes           text,
+    was_pr_at_time  boolean not null,
+    is_current_pr   boolean not null
+)
+
+body_metrics (
+    id         integer primary key,
+    name       text not null unique,
+    unit       text not null,
+    is_derived boolean not null default false  -- derived metrics are never stored in body_measurements
+)
+
+body_measurements (
+    id         integer primary key,
+    date       text not null,
+    value      real not null,
+    measure_id integer not null references body_metrics(id)
+)
+
+user_settings (
+    id                integer primary key check (id = 1),
+    height_cm         integer not null default 178,
+    unit              text not null default 'kg',         -- 'kg' | 'lbs'
+    estimate_body_fat boolean not null default true,
+    dark_mode         boolean not null default true,
+    sex               text not null default 'male'        -- 'male' | 'female'
+)
 ```
 
 **PR logic**: A set `(weight, reps)` is a PR if no other set for that exercise has `weight >= x AND reps >= n` — the Pareto frontier of the (weight, reps) space.
@@ -39,75 +87,115 @@ user_settings       -- single row: height_cm, unit, dark_mode, estimate_body_fat
 
 Pending migrations to add as features land:
 ```
-v4: ALTER TABLE user_settings ADD COLUMN season_start TEXT DEFAULT '01-01'
-v5: ALTER TABLE user_settings ADD COLUMN use_seasons BOOLEAN DEFAULT true
-v6: ALTER TABLE sets ADD COLUMN is_season_pr BOOLEAN DEFAULT false
-v7: CREATE TABLE templates / template_exercises
+v4: Schema refactor — recreate workouts, workout_exercises, sets (see section 5)
+v5: ALTER TABLE user_settings ADD COLUMN season_start TEXT DEFAULT '01-01'
+v6: ALTER TABLE user_settings ADD COLUMN use_seasons BOOLEAN DEFAULT true
+v7: ALTER TABLE sets ADD COLUMN is_season_pr BOOLEAN DEFAULT false
+v8: CREATE TABLE templates / template_exercises
 ```
 
 ---
 
-### 4. Android build/test workflow
+### 5. Workout/exercise model refactor
 
-The current process — `pnpm tauri android build` → wait → sign manually → `adb install` → wait — has too much friction for iterative testing. Two things to fix: iteration speed and release signing.
+**Problem**: Two constraints limit what the app can represent:
+- `workouts.date` is `UNIQUE` — only one workout per day
+- `workout_exercises` has `UNIQUE(workout_id, exercise_id)` — an exercise can only appear once per workout, making A→B→A structure impossible
+- `sets` references `(workout_id, exercise_id)` as a composite rather than a specific exercise instance — there is no first-class "exercise instance with no sets", which makes templates awkward (applying a template would require dummy sets)
 
-**For iteration: use `tauri android dev` on a real device**
+**Scope**: Remove both unique constraints, migrate `sets` to reference a `workout_exercise_id` FK, and keep `exercise_id` on `sets` as a denormalized column for fast PR queries. Multiple workouts per day is intentionally deferred — the schema will support it, but the frontend will not expose it yet (see end of document).
 
-`pnpm tauri android dev` connects to a USB-attached device via ADB, builds a debug APK (no signing required — uses the auto-generated debug keystore), installs it, and starts the app. Frontend changes hot-reload via Vite without reinstalling. Rust changes trigger a full rebuild and reinstall automatically.
+#### Schema changes (migration v4)
 
-Prerequisites:
-- Enable Developer Options on the phone (tap Build Number 7 times in Settings → About)
-- Enable USB Debugging in Developer Options
-- Trust the Mac when prompted on the phone
-- Verify device is visible: `adb devices` should list it
+Three tables must be recreated — SQLite cannot drop constraints in-place:
 
-This replaces the manual build → sign → install loop entirely for day-to-day testing.
+```sql
+-- workouts: add day_order, drop unique on date
+CREATE TABLE workouts_new (
+    id        integer primary key,
+    date      text not null,
+    day_order integer not null default 1
+);
+INSERT INTO workouts_new SELECT id, date, 1 FROM workouts;
+DROP TABLE workouts; ALTER TABLE workouts_new RENAME TO workouts;
 
-**For release testing: automate signing**
+-- workout_exercises: drop unique(workout_id, exercise_id)
+CREATE TABLE workout_exercises_new (
+    id             integer primary key,
+    workout_id     integer not null references workouts(id),
+    exercise_id    integer not null references exercises(id),
+    exercise_order integer not null
+);
+INSERT INTO workout_exercises_new SELECT * FROM workout_exercises;
+DROP TABLE workout_exercises; ALTER TABLE workout_exercises_new RENAME TO workout_exercises;
 
-Release APKs require a signed keystore. Set this up once so `pnpm tauri android build` produces a ready-to-install APK without manual steps:
+-- sets: replace (workout_id, exercise_id) with workout_exercise_id
+-- exercise_id kept denormalized for fast PR queries (WHERE exercise_id = ?)
+CREATE TABLE sets_new (
+    id                  integer primary key,
+    workout_exercise_id integer not null references workout_exercises(id),
+    exercise_id         integer not null references exercises(id),
+    set_order           integer not null,
+    weight_kg           real not null,
+    reps                integer not null,
+    notes               text,
+    was_pr_at_time      boolean not null,
+    is_current_pr       boolean not null
+);
+INSERT INTO sets_new
+    SELECT s.id, we.id, s.exercise_id, s.set_order,
+           s.weight_kg, s.reps, s.notes, s.was_pr_at_time, s.is_current_pr
+    FROM sets s
+    JOIN workout_exercises we
+      ON we.workout_id = s.workout_id AND we.exercise_id = s.exercise_id;
+DROP TABLE sets; ALTER TABLE sets_new RENAME TO sets;
+```
 
-1. Generate a keystore (one-time):
-   ```bash
-   keytool -genkey -v -keystore fitness-notes.jks -alias fitness-notes \
-     -keyalg RSA -keysize 2048 -validity 10000
-   ```
-   Store it outside the repo (e.g. `~/.android/fitness-notes.jks`).
+#### Backend changes (`src-tauri/src/`)
 
-2. Configure Tauri to use it — in `src-tauri/gen/android/app/build.gradle.kts`, add a `signingConfigs` block:
-   ```kotlin
-   signingConfigs {
-       create("release") {
-           storeFile = file(System.getenv("ANDROID_KEYSTORE_PATH") ?: "")
-           storePassword = System.getenv("ANDROID_KEYSTORE_PASS") ?: ""
-           keyAlias = System.getenv("ANDROID_KEY_ALIAS") ?: ""
-           keyPassword = System.getenv("ANDROID_KEY_PASS") ?: ""
-       }
-   }
-   buildTypes {
-       release { signingConfig = signingConfigs.getByName("release") }
-   }
-   ```
-   Set the four env vars in your shell profile (not committed to the repo).
+New command:
+- `add_exercise_to_workout(workout_id, exercise_id) → workout_exercise_id` — inserts a `workout_exercises` row and returns its id; the frontend calls this before inserting the first set for a new exercise instance
 
-3. Add a deploy script at the repo root (`deploy.sh`):
-   ```bash
-   #!/usr/bin/env bash
-   set -e
-   pnpm tauri android build
-   adb install -r src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk
-   echo "Installed."
-   ```
-   `adb install -r` replaces the existing install without losing data. Make executable: `chmod +x deploy.sh`. Run with `./deploy.sh`.
+Changed commands in `sets.rs`:
+- `upsert_set` — takes `workout_exercise_id` instead of `(date, exercise_id)`; set_order MAX query scoped to `workout_exercise_id`
+- `delete_set` — cleanup uses `workout_exercise_id` to decide whether to remove the `workout_exercises` row
+- `reorder_sets` — scope changes from `(workout_id, exercise_id)` to `workout_exercise_id`
 
-**Summary**:
-- Daily iteration → `pnpm tauri android dev` (USB, debug, HMR)
-- Release testing → `./deploy.sh` (signs + installs in one step)
-- No more manual signing or copy-paste adb commands
+Changed commands in `workouts.rs`:
+- `get_workout_for_date` — return type adds `workout_exercise_id` to each `ExerciseWithSets`
+- `get_workouts_for_range` — same join change
+- `get_active_dates` — add explicit `DISTINCT` on date (previously implicit from unique constraint)
+- `reorder_exercises` — takes `workout_id` instead of `date` (date is no longer a unique workout key)
+
+Changed commands in `exercises.rs`:
+- `get_exercise_history`, `get_exercise_graph_data`, `get_rep_maxes`, `get_last_set` — join structure changes; queries using denormalized `sets.exercise_id` are unchanged
+- `merge_exercise_into_existing` — `UPDATE sets SET exercise_id = ?` plus `UPDATE workout_exercises SET exercise_id = ?`
+- `delete_exercise`, `delete_category` — validation COUNT queries unchanged (use denorm `sets.exercise_id`)
+
+Changed command in `import.rs`:
+- `import_fitnotes_rows` — workout lookup changes from `INSERT OR IGNORE` (relied on unique date constraint) to `SELECT id FROM workouts WHERE date = ? AND day_order = 1`; set insertion uses `workout_exercise_id`
+
+#### Frontend changes (`src/`)
+
+**Route rename**: `src/routes/exercise/[id]/[date]/` → `src/routes/exercise/[workout_exercise_id]/`
+The `(exercise_id, date)` pair is no longer a unique identifier once exercises can repeat within a day. `workout_exercise_id` uniquely identifies an exercise instance. Human-readable context (date, name) is loaded from `get_workout_for_date`.
+
+**`src/lib/exercise.ts`**:
+- `ExerciseWithSets` gains `workout_exercise_id: number`
+- `Set` drops `workout_id`
+
+**`src/lib/DayCard.svelte`**:
+- Navigation: `goto(/exercise/${ex.exercise_id}/${date})` → `goto(/exercise/${ex.workout_exercise_id})`
+- Adding an exercise: call `add_exercise_to_workout` to get `workout_exercise_id` before navigating
+- `reorder_exercises` passes `workout_id` instead of `date`
+
+**`src/routes/exercise/[workout_exercise_id]/+page.svelte`**:
+- `upsert_set` and `reorder_sets` pass `workout_exercise_id`
+- Exercise context (name, date) resolved from `workout_exercise_id` via the workout data
 
 ---
 
-### 5. Settings menu
+### 6. Settings menu
 
 The `/settings` page currently only has import and delete-all. Expose the user profile stored in `user_settings`.
 
@@ -127,7 +215,7 @@ Load on mount; save on change (debounced or on blur). Apply dark mode in `src/ro
 
 ---
 
-### 6. Complete body tracker
+### 7. Complete body tracker
 
 Graph and PRs tabs exist in `BodyHeader.svelte` but have no routes yet.
 
@@ -147,11 +235,11 @@ Graph and PRs tabs exist in `BodyHeader.svelte` but have no routes yet.
 
 ---
 
-### 7. Workout templates
+### 8. Workout templates
 
 Save a named list of exercises as a reusable template; apply it to any date to pre-populate the day's workout.
 
-**DB changes** (migration 5):
+**DB changes** (migration v8):
 ```sql
 CREATE TABLE templates (
     id   INTEGER PRIMARY KEY,
@@ -180,11 +268,11 @@ CREATE TABLE template_exercises (
 
 ---
 
-### 8. Season-wise personal bests
+### 9. Season-wise personal bests
 
 A season is a 1-year window starting from a user-configured month/day (MM-DD), recurring annually. The current season = from the most recent occurrence of that date to today.
 
-**DB changes** (migrations 2–4):
+**DB changes** (migrations v5–v7):
 ```sql
 ALTER TABLE user_settings ADD COLUMN season_start TEXT DEFAULT '01-01';
 ALTER TABLE user_settings ADD COLUMN use_seasons  BOOLEAN DEFAULT true;
@@ -204,7 +292,7 @@ ALTER TABLE sets           ADD COLUMN is_season_pr BOOLEAN DEFAULT false;
 
 ---
 
-### 9. Analysis page
+### 10. Analysis page
 
 New route `/analysis`. Three sections:
 
@@ -218,7 +306,7 @@ Add an analysis icon to the header nav in `src/routes/+layout.svelte`.
 
 ---
 
-### 10. Data safety
+### 11. Data safety
 
 Three layers of protection, all local, no server required.
 
@@ -272,9 +360,23 @@ New Rust commands:
 4. ~~**Android build**~~ ✓ done
 5. ~~**Body metrics overhaul**~~ ✓ done — is_derived, FitNotes renames, on-the-fly derived metrics, write guard in upsert
 6. ~~**Body measurements import**~~ ✓ done
-7. **Android build/test workflow** — reduce iteration friction
-8. **Settings menu** — user profile, dark mode, manual export/restore
-9. **Complete body tracker** (graph + PRs)
-10. **Workout templates**
-11. **Season PRs** — depends on settings
-12. **Analysis page** — most complex, last
+7. ~~**Android build/test workflow**~~ ✓ done — `tauri android dev` for iteration, `deploy.sh` for release
+8. **Workout/exercise model refactor** — workout_exercise_id, exercise repetition, template foundation
+9. **Settings menu** — user profile, dark mode, manual export/restore
+10. **Complete body tracker** (graph + PRs)
+11. **Workout templates** — depends on refactor (section 8)
+12. **Season PRs** — depends on settings
+13. **Analysis page** — most complex, last
+
+---
+
+## Deferred: multiple workouts per day
+
+The schema refactor (section 5) removes the `UNIQUE` constraint on `workouts.date` and adds a `day_order` column, so the database already supports multiple workouts per day. This is intentionally not exposed in the UI yet.
+
+When/if the time comes, the remaining work is frontend-only:
+
+- **Feed** (`src/lib/DayCard.svelte`): group exercises under named workout blocks ("Workout 1", "Workout 2"); add an "Add workout" button per day that calls a new `create_workout(date) → workout_id` command
+- **`create_workout` command** (`src-tauri/src/commands/workouts.rs`): `INSERT INTO workouts (date, day_order) VALUES (?1, (SELECT COALESCE(MAX(day_order), 0) + 1 FROM workouts WHERE date = ?1))`
+- **`reorder_exercises`**: already takes `workout_id` after the refactor, so multi-workout reordering works without further backend changes
+- No migration needed — the schema is already correct after v4
