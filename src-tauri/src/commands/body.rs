@@ -265,7 +265,7 @@ pub fn list_metrics(
 
 fn calculate_derived_metrics(
     settings: &Settings,
-    result: &Vec<Measurement>,
+    result: &[Measurement],
     derived_ids: &DerivedMetricIds,
 ) -> Vec<Measurement> {
     let weight = result

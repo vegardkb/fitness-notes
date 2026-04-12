@@ -89,7 +89,7 @@ pub fn delete_set(
         .query_row(
             "SELECT exercise_id FROM sets WHERE id = ?1",
             rusqlite::params![id],
-            |row| Ok(row.get::<_, i64>(0)?),
+            |row| row.get::<_, i64>(0),
         )
         .map_err(|e| e.to_string())?;
 
