@@ -1,13 +1,13 @@
 use super::test_db;
 use crate::commands::exercises::{
-    get_rep_maxes_inner, list_exercise_categories_inner, list_exercises_in_category_inner,
+    get_exercise_history_inner, get_rep_maxes_inner, list_exercise_categories_inner,
+    list_exercises_in_category_inner,
 };
 use crate::commands::sets::upsert_set_inner;
 use crate::commands::workouts::{add_exercise_to_workout_inner, get_active_dates_inner};
-use crate::database::recompute_pr_flags;
 
 #[test]
-fn test_add_two_sets() {
+fn test_add_three_sets_on_two_days() {
     let conn = test_db();
     let categories = list_exercise_categories_inner(&conn).unwrap();
     let category = &categories[0];
@@ -46,4 +46,43 @@ fn test_add_two_sets() {
     assert_eq!(dates.len(), 2);
     assert_eq!(dates[0], "2024-01-01");
     assert_eq!(dates[1], "2024-01-11");
+
+    let exercise_history = get_exercise_history_inner(&conn, exercise.id).unwrap();
+    assert_eq!(exercise_history.len(), 2);
+    assert_eq!(exercise_history[1].date, "2024-01-01");
+    assert_eq!(exercise_history[0].date, "2024-01-11");
+
+    assert_eq!(
+        exercise_history[1].exercises[0].sets[0].is_current_pr,
+        false
+    );
+    assert_eq!(
+        exercise_history[1].exercises[0].sets[0].was_pr_at_time,
+        true
+    );
+    assert_eq!(exercise_history[1].exercises[0].sets[1].is_current_pr, true);
+    assert_eq!(
+        exercise_history[1].exercises[0].sets[1].was_pr_at_time,
+        true
+    );
+    assert_eq!(exercise_history[0].exercises[0].sets[0].is_current_pr, true);
+    assert_eq!(
+        exercise_history[0].exercises[0].sets[0].was_pr_at_time,
+        true
+    );
+}
+
+#[test]
+fn migrations_are_idempotent() {
+    let conn = test_db();
+    crate::database::run_migrations(&conn).unwrap();
+}
+
+#[test]
+fn schema_version_is_current() {
+    let conn = test_db();
+    let version: u32 = conn
+        .query_row("PRAGMA user_version", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(version, 4);
 }
