@@ -2,13 +2,10 @@ use crate::database;
 use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 
-#[tauri::command]
-pub fn parse_fitnotes_csv(
+pub fn parse_fitnotes_csv_inner(
+    conn: &rusqlite::Connection,
     csv_text: String,
-    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<ParseResult, String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
-
     let mut known: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
     let mut stmt = conn
         .prepare("SELECT id, name FROM exercises")
@@ -77,12 +74,18 @@ pub fn parse_fitnotes_csv(
 }
 
 #[tauri::command]
-pub fn parse_body_measurements_csv(
-    csv: String,
+pub fn parse_fitnotes_csv(
+    csv_text: String,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<ParseBodyResult, String> {
+) -> Result<ParseResult, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    parse_fitnotes_csv_inner(&conn, csv_text)
+}
 
+pub fn parse_body_measurements_csv_inner(
+    conn: &rusqlite::Connection,
+    csv: String,
+) -> Result<ParseBodyResult, String> {
     let mut known: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
     let mut stmt = conn
         .prepare("SELECT id, name FROM body_metrics")
@@ -146,12 +149,18 @@ pub fn parse_body_measurements_csv(
 }
 
 #[tauri::command]
-pub fn import_fitnotes_rows(
-    rows: Vec<ExerciseRow>,
+pub fn parse_body_measurements_csv(
+    csv: String,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<ImportResult, String> {
+) -> Result<ParseBodyResult, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    parse_body_measurements_csv_inner(&conn, csv)
+}
 
+pub fn import_fitnotes_rows_inner(
+    conn: &rusqlite::Connection,
+    rows: Vec<ExerciseRow>,
+) -> Result<ImportResult, String> {
     let mut name_to_id: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
     let mut date_to_workout: std::collections::HashMap<String, i64> =
         std::collections::HashMap::new();
@@ -271,7 +280,7 @@ pub fn import_fitnotes_rows(
     }
 
     for ex_id in &affected_exercises {
-        database::recompute_pr_flags(&conn, *ex_id)?;
+        database::recompute_pr_flags(conn, *ex_id)?;
     }
 
     Ok(ImportResult {
@@ -281,12 +290,18 @@ pub fn import_fitnotes_rows(
 }
 
 #[tauri::command]
-pub fn import_body_measurement_rows(
-    rows: Vec<BodyRow>,
+pub fn import_fitnotes_rows(
+    rows: Vec<ExerciseRow>,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<BodyImportResult, String> {
+) -> Result<ImportResult, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    import_fitnotes_rows_inner(&conn, rows)
+}
 
+pub fn import_body_measurement_rows_inner(
+    conn: &rusqlite::Connection,
+    rows: Vec<BodyRow>,
+) -> Result<BodyImportResult, String> {
     let mut name_to_id: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
     let mut affected_dates: std::collections::HashSet<String> = std::collections::HashSet::new();
     let mut measurements_imported = 0;
@@ -360,6 +375,15 @@ pub fn import_body_measurement_rows(
         measurements_imported,
         days_touched,
     })
+}
+
+#[tauri::command]
+pub fn import_body_measurement_rows(
+    rows: Vec<BodyRow>,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<BodyImportResult, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    import_body_measurement_rows_inner(&conn, rows)
 }
 
 #[derive(Serialize, Deserialize)]

@@ -2,17 +2,14 @@ use crate::models::{DayMeasurement, DerivedMetricIds, Measurement, Metric, Sex};
 
 use crate::{database::get_settings, models::Settings};
 
-#[tauri::command]
-pub fn upsert_body_measurement(
+pub fn upsert_body_measurement_inner(
+    conn: &rusqlite::Connection,
     id: Option<i64>,
     date: &str,
     measure_id: i64,
     value: f64,
-    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<i64, String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
-
-    let derived_ids = get_derived_metric_ids(&conn)?;
+    let derived_ids = get_derived_metric_ids(conn)?;
     if derived_ids.bmi == measure_id
         || derived_ids.bf == measure_id
         || derived_ids.ffmi == measure_id
@@ -41,12 +38,18 @@ pub fn upsert_body_measurement(
 }
 
 #[tauri::command]
-pub fn delete_body_measurement(
-    id: i64,
+pub fn upsert_body_measurement(
+    id: Option<i64>,
+    date: &str,
+    measure_id: i64,
+    value: f64,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<(), String> {
+) -> Result<i64, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    upsert_body_measurement_inner(&conn, id, date, measure_id, value)
+}
 
+pub fn delete_body_measurement_inner(conn: &rusqlite::Connection, id: i64) -> Result<(), String> {
     conn.execute("DELETE FROM body_measurements WHERE id = ?1", [id])
         .map_err(|e| e.to_string())?;
 
@@ -54,12 +57,18 @@ pub fn delete_body_measurement(
 }
 
 #[tauri::command]
-pub fn get_last_measurements_for_date(
-    date: &str,
+pub fn delete_body_measurement(
+    id: i64,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<Vec<Measurement>, String> {
+) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    delete_body_measurement_inner(&conn, id)
+}
 
+pub fn get_last_measurements_for_date_inner(
+    conn: &rusqlite::Connection,
+    date: &str,
+) -> Result<Vec<Measurement>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT bm.name, b.value, bm.unit, bm.id, b.id, b.date
@@ -104,8 +113,8 @@ pub fn get_last_measurements_for_date(
         });
     }
 
-    let settings = get_settings(&conn)?;
-    let derived_metrics = get_derived_metric_ids(&conn)?;
+    let settings = get_settings(conn)?;
+    let derived_metrics = get_derived_metric_ids(conn)?;
     let derived_result = calculate_derived_metrics(&settings, &result, &derived_metrics);
     for m in derived_result {
         result.push(m);
@@ -115,11 +124,17 @@ pub fn get_last_measurements_for_date(
 }
 
 #[tauri::command]
-pub fn get_measurement_history(
+pub fn get_last_measurements_for_date(
+    date: &str,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<Vec<DayMeasurement>, String> {
+) -> Result<Vec<Measurement>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    get_last_measurements_for_date_inner(&conn, date)
+}
 
+pub fn get_measurement_history_inner(
+    conn: &rusqlite::Connection,
+) -> Result<Vec<DayMeasurement>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT bm.name, b.value, bm.unit, bm.id, b.id, b.date
@@ -171,8 +186,8 @@ pub fn get_measurement_history(
         day.measurements.push(measurement);
     }
 
-    let derived_metrics = get_derived_metric_ids(&conn)?;
-    let settings = get_settings(&conn)?;
+    let derived_metrics = get_derived_metric_ids(conn)?;
+    let settings = get_settings(conn)?;
     for day in &mut result {
         let derived_result =
             calculate_derived_metrics(&settings, &day.measurements, &derived_metrics);
@@ -185,12 +200,17 @@ pub fn get_measurement_history(
 }
 
 #[tauri::command]
-pub fn get_measurements_for_date(
-    date: &str,
+pub fn get_measurement_history(
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<Vec<Measurement>, String> {
+) -> Result<Vec<DayMeasurement>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    get_measurement_history_inner(&conn)
+}
 
+pub fn get_measurements_for_date_inner(
+    conn: &rusqlite::Connection,
+    date: &str,
+) -> Result<Vec<Measurement>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT bm.name, b.value, bm.unit, bm.id, b.id
@@ -228,8 +248,8 @@ pub fn get_measurements_for_date(
             id: Some(id),
         });
     }
-    let settings = get_settings(&conn)?;
-    let derived_metrics = get_derived_metric_ids(&conn)?;
+    let settings = get_settings(conn)?;
+    let derived_metrics = get_derived_metric_ids(conn)?;
     let derived_result = calculate_derived_metrics(&settings, &result, &derived_metrics);
     for m in derived_result {
         result.push(m);
@@ -239,10 +259,15 @@ pub fn get_measurements_for_date(
 }
 
 #[tauri::command]
-pub fn list_metrics(
+pub fn get_measurements_for_date(
+    date: &str,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<Vec<Metric>, String> {
+) -> Result<Vec<Measurement>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    get_measurements_for_date_inner(&conn, date)
+}
+
+pub fn list_metrics_inner(conn: &rusqlite::Connection) -> Result<Vec<Metric>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT bm.name, bm.unit, bm.id, bm.is_derived FROM body_metrics bm
@@ -261,6 +286,14 @@ pub fn list_metrics(
         .map_err(|e| e.to_string())?;
 
     rows.map(|r| r.map_err(|e| e.to_string())).collect()
+}
+
+#[tauri::command]
+pub fn list_metrics(
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<Vec<Metric>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    list_metrics_inner(&conn)
 }
 
 fn calculate_derived_metrics(

@@ -3,11 +3,9 @@ use crate::models::{
     Category, DatedValue, DayWorkout, Exercise, ExerciseWithSets, RepMax, Set, SetMinimal,
 };
 
-#[tauri::command]
-pub fn list_exercise_categories(
-    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+pub fn list_exercise_categories_inner(
+    conn: &rusqlite::Connection,
 ) -> Result<Vec<Category>, String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare("SELECT name, id FROM categories")
         .map_err(|e| e.to_string())?;
@@ -30,11 +28,17 @@ pub fn list_exercise_categories(
 }
 
 #[tauri::command]
-pub fn list_exercises_in_category(
-    category_id: i64,
+pub fn list_exercise_categories(
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<Vec<Exercise>, String> {
+) -> Result<Vec<Category>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    list_exercise_categories_inner(&conn)
+}
+
+pub fn list_exercises_in_category_inner(
+    conn: &rusqlite::Connection,
+    category_id: i64,
+) -> Result<Vec<Exercise>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT e.id, e.name FROM exercises e
@@ -54,12 +58,19 @@ pub fn list_exercises_in_category(
 }
 
 #[tauri::command]
-pub fn create_exercise(
-    name: &str,
+pub fn list_exercises_in_category(
     category_id: i64,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<i64, String> {
+) -> Result<Vec<Exercise>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    list_exercises_in_category_inner(&conn, category_id)
+}
+
+pub fn create_exercise_inner(
+    conn: &rusqlite::Connection,
+    name: &str,
+    category_id: i64,
+) -> Result<i64, String> {
     conn.execute(
         "INSERT INTO exercises (name, category_id) VALUES (?1, ?2)",
         rusqlite::params![name, category_id],
@@ -69,11 +80,16 @@ pub fn create_exercise(
 }
 
 #[tauri::command]
-pub fn delete_exercise(
-    id: i64,
+pub fn create_exercise(
+    name: &str,
+    category_id: i64,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<(), String> {
+) -> Result<i64, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    create_exercise_inner(&conn, name, category_id)
+}
+
+pub fn delete_exercise_inner(conn: &rusqlite::Connection, id: i64) -> Result<(), String> {
     let set_count: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM workout_exercises WHERE exercise_id = ?1",
@@ -90,12 +106,19 @@ pub fn delete_exercise(
 }
 
 #[tauri::command]
-pub fn rename_exercise(
+pub fn delete_exercise(
     id: i64,
-    name: &str,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    delete_exercise_inner(&conn, id)
+}
+
+pub fn rename_exercise_inner(
+    conn: &rusqlite::Connection,
+    id: i64,
+    name: &str,
+) -> Result<(), String> {
     let exercise_count: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM exercises WHERE id = ?1",
@@ -127,11 +150,16 @@ pub fn rename_exercise(
 }
 
 #[tauri::command]
-pub fn create_category(
+pub fn rename_exercise(
+    id: i64,
     name: &str,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<i64, String> {
+) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    rename_exercise_inner(&conn, id, name)
+}
+
+pub fn create_category_inner(conn: &rusqlite::Connection, name: &str) -> Result<i64, String> {
     conn.execute(
         "INSERT INTO categories (name) VALUES (?1)",
         rusqlite::params![name],
@@ -141,12 +169,19 @@ pub fn create_category(
 }
 
 #[tauri::command]
-pub fn rename_category(
-    id: i64,
+pub fn create_category(
     name: &str,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<(), String> {
+) -> Result<i64, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    create_category_inner(&conn, name)
+}
+
+pub fn rename_category_inner(
+    conn: &rusqlite::Connection,
+    id: i64,
+    name: &str,
+) -> Result<(), String> {
     let category_count: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM categories WHERE id = ?1",
@@ -166,11 +201,16 @@ pub fn rename_category(
 }
 
 #[tauri::command]
-pub fn delete_category(
+pub fn rename_category(
     id: i64,
+    name: &str,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    rename_category_inner(&conn, id, name)
+}
+
+pub fn delete_category_inner(conn: &rusqlite::Connection, id: i64) -> Result<(), String> {
     let set_count: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM workout_exercises we
@@ -202,12 +242,19 @@ pub fn delete_category(
 }
 
 #[tauri::command]
-pub fn merge_exercise_into_existing(
-    from_id: i64,
-    to_id: i64,
+pub fn delete_category(
+    id: i64,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<(), String> {
-    let mut conn = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    delete_category_inner(&conn, id)
+}
+
+pub fn merge_exercise_into_existing_inner(
+    conn: &mut rusqlite::Connection,
+    from_id: i64,
+    to_id: i64,
+) -> Result<(), String> {
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     tx.execute(
@@ -230,18 +277,26 @@ pub fn merge_exercise_into_existing(
 
     tx.commit().map_err(|e| e.to_string())?;
 
-    recompute_pr_flags(&conn, to_id).map_err(|e| e.to_string())?;
+    recompute_pr_flags(conn, to_id).map_err(|e| e.to_string())?;
 
     Ok(())
 }
 
 #[tauri::command]
-pub fn merge_category_into_existing(
+pub fn merge_exercise_into_existing(
     from_id: i64,
     to_id: i64,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<(), String> {
     let mut conn = db.lock().map_err(|e| e.to_string())?;
+    merge_exercise_into_existing_inner(&mut conn, from_id, to_id)
+}
+
+pub fn merge_category_into_existing_inner(
+    conn: &mut rusqlite::Connection,
+    from_id: i64,
+    to_id: i64,
+) -> Result<(), String> {
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     tx.execute(
@@ -261,11 +316,16 @@ pub fn merge_category_into_existing(
 }
 
 #[tauri::command]
-pub fn get_exercise(
-    id: i64,
+pub fn merge_category_into_existing(
+    from_id: i64,
+    to_id: i64,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<Exercise, String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
+) -> Result<(), String> {
+    let mut conn = db.lock().map_err(|e| e.to_string())?;
+    merge_category_into_existing_inner(&mut conn, from_id, to_id)
+}
+
+pub fn get_exercise_inner(conn: &rusqlite::Connection, id: i64) -> Result<Exercise, String> {
     conn.query_row(
         "SELECT id, name FROM exercises WHERE id = ?1",
         rusqlite::params![id],
@@ -280,12 +340,18 @@ pub fn get_exercise(
 }
 
 #[tauri::command]
-pub fn get_exercise_history(
-    exercise_id: i64,
+pub fn get_exercise(
+    id: i64,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<Vec<DayWorkout>, String> {
+) -> Result<Exercise, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    get_exercise_inner(&conn, id)
+}
 
+pub fn get_exercise_history_inner(
+    conn: &rusqlite::Connection,
+    exercise_id: i64,
+) -> Result<Vec<DayWorkout>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT w.date, e.id, e.name, c.name, we.exercise_order, we.id,
@@ -376,14 +442,20 @@ pub fn get_exercise_history(
 }
 
 #[tauri::command]
-pub fn get_exercise_graph_data(
+pub fn get_exercise_history(
+    exercise_id: i64,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<Vec<DayWorkout>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    get_exercise_history_inner(&conn, exercise_id)
+}
+
+pub fn get_exercise_graph_data_inner(
+    conn: &rusqlite::Connection,
     exercise_id: i64,
     from_date: &str,
     to_date: &str,
-    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<Vec<DatedValue>, String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
-
     let mut stmt = conn
         .prepare(
             "SELECT w.date, s.weight_kg, s.reps
@@ -424,12 +496,20 @@ pub fn get_exercise_graph_data(
 }
 
 #[tauri::command]
-pub fn get_rep_maxes(
+pub fn get_exercise_graph_data(
     exercise_id: i64,
+    from_date: &str,
+    to_date: &str,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<Vec<RepMax>, String> {
+) -> Result<Vec<DatedValue>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    get_exercise_graph_data_inner(&conn, exercise_id, from_date, to_date)
+}
 
+pub fn get_rep_maxes_inner(
+    conn: &rusqlite::Connection,
+    exercise_id: i64,
+) -> Result<Vec<RepMax>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT w.date, s.weight_kg, s.reps
@@ -467,12 +547,18 @@ pub fn get_rep_maxes(
 }
 
 #[tauri::command]
-pub fn get_last_set(
+pub fn get_rep_maxes(
     exercise_id: i64,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<SetMinimal, String> {
+) -> Result<Vec<RepMax>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    get_rep_maxes_inner(&conn, exercise_id)
+}
 
+pub fn get_last_set_inner(
+    conn: &rusqlite::Connection,
+    exercise_id: i64,
+) -> Result<SetMinimal, String> {
     let mut stmt = conn
         .prepare(
             "SELECT s.weight_kg, s.reps FROM sets s
@@ -493,6 +579,15 @@ pub fn get_last_set(
     let (weight, reps) = row;
 
     Ok(SetMinimal { weight, reps })
+}
+
+#[tauri::command]
+pub fn get_last_set(
+    exercise_id: i64,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<SetMinimal, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    get_last_set_inner(&conn, exercise_id)
 }
 
 fn estimate_1rm(weight: f64, reps: i64) -> f64 {

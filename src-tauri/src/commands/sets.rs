@@ -1,17 +1,14 @@
 use crate::database::recompute_pr_flags;
 use crate::models::Set;
 
-#[tauri::command]
-pub fn upsert_set(
+pub fn upsert_set_inner(
+    conn: &rusqlite::Connection,
     id: Option<i64>,
     workout_exercise_id: i64,
     weight_kg: f64,
     reps: i64,
     notes: Option<String>,
-    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<Set, String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
-
     let exercise_id = conn
         .query_row(
             "SELECT exercise_id FROM workout_exercises WHERE id = ?1",
@@ -57,7 +54,7 @@ pub fn upsert_set(
         set_id = conn.last_insert_rowid();
     }
 
-    recompute_pr_flags(&conn, exercise_id)?;
+    recompute_pr_flags(conn, exercise_id)?;
 
     let (was_pr_at_time, is_current_pr) = conn
         .query_row(
@@ -79,12 +76,19 @@ pub fn upsert_set(
 }
 
 #[tauri::command]
-pub fn delete_set(
-    id: i64,
+pub fn upsert_set(
+    id: Option<i64>,
+    workout_exercise_id: i64,
+    weight_kg: f64,
+    reps: i64,
+    notes: Option<String>,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<(), String> {
+) -> Result<Set, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    upsert_set_inner(&conn, id, workout_exercise_id, weight_kg, reps, notes)
+}
 
+pub fn delete_set_inner(conn: &rusqlite::Connection, id: i64) -> Result<(), String> {
     let exercise_id = conn
         .query_row(
             "SELECT exercise_id FROM sets WHERE id = ?1",
@@ -96,18 +100,25 @@ pub fn delete_set(
     conn.execute("DELETE FROM sets WHERE id = ?1", rusqlite::params![id])
         .map_err(|e| e.to_string())?;
 
-    recompute_pr_flags(&conn, exercise_id)?;
+    recompute_pr_flags(conn, exercise_id)?;
 
     Ok(())
 }
 
 #[tauri::command]
-pub fn reorder_sets(
-    workout_exercise_id: i64,
-    ordered_set_ids: Vec<i64>,
+pub fn delete_set(
+    id: i64,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    delete_set_inner(&conn, id)
+}
+
+pub fn reorder_sets_inner(
+    conn: &rusqlite::Connection,
+    workout_exercise_id: i64,
+    ordered_set_ids: Vec<i64>,
+) -> Result<(), String> {
     for (i, set_id) in ordered_set_ids.iter().enumerate() {
         conn.execute(
             "UPDATE sets SET set_order = ?1 WHERE id = ?2",
@@ -122,7 +133,31 @@ pub fn reorder_sets(
             |r| r.get(0),
         )
         .map_err(|e| e.to_string())?;
-    recompute_pr_flags(&conn, exercise_id)?;
+    recompute_pr_flags(conn, exercise_id)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn reorder_sets(
+    workout_exercise_id: i64,
+    ordered_set_ids: Vec<i64>,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    reorder_sets_inner(&conn, workout_exercise_id, ordered_set_ids)
+}
+
+pub fn reorder_exercises_inner(
+    conn: &rusqlite::Connection,
+    ordered_workout_exercise_ids: Vec<i64>,
+) -> Result<(), String> {
+    for (i, workout_exercise_id) in ordered_workout_exercise_ids.iter().enumerate() {
+        conn.execute(
+            "UPDATE workout_exercises SET exercise_order = ?1 WHERE id = ?2",
+            rusqlite::params![i as i64 + 1, workout_exercise_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 
@@ -132,13 +167,5 @@ pub fn reorder_exercises(
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-
-    for (i, workout_exercise_id) in ordered_workout_exercise_ids.iter().enumerate() {
-        conn.execute(
-            "UPDATE workout_exercises SET exercise_order = ?1 WHERE id = ?2",
-            rusqlite::params![i as i64 + 1, workout_exercise_id],
-        )
-        .map_err(|e| e.to_string())?;
-    }
-    Ok(())
+    reorder_exercises_inner(&conn, ordered_workout_exercise_ids)
 }

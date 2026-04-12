@@ -24,6 +24,9 @@ mod commands;
 mod database;
 mod models;
 
+#[cfg(test)]
+mod tests;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -73,9 +76,7 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
-#[tauri::command]
-fn delete_all_data(db: tauri::State<std::sync::Mutex<rusqlite::Connection>>) -> Result<(), String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
+pub fn delete_all_data_inner(conn: &rusqlite::Connection) -> Result<(), String> {
     conn.execute_batch(
         "DELETE FROM sets;
          DELETE FROM workout_exercises;
@@ -83,6 +84,12 @@ fn delete_all_data(db: tauri::State<std::sync::Mutex<rusqlite::Connection>>) -> 
          DELETE FROM body_measurements;",
     )
     .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_all_data(db: tauri::State<std::sync::Mutex<rusqlite::Connection>>) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    delete_all_data_inner(&conn)
 }
 
 fn initialize_db(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {

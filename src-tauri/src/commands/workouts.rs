@@ -1,13 +1,10 @@
 use crate::models::{DayWorkout, ExerciseWithSets, Set};
 use rusqlite::OptionalExtension;
 
-#[tauri::command]
-pub fn get_workout_for_date(
+pub fn get_workout_for_date_inner(
+    conn: &rusqlite::Connection,
     date: &str,
-    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<Vec<ExerciseWithSets>, String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
-
     let mut stmt = conn
         .prepare(
             "SELECT e.id, e.name, c.name, we.exercise_order, we.id,
@@ -85,12 +82,19 @@ pub fn get_workout_for_date(
 }
 
 #[tauri::command]
-pub fn get_workouts_for_range(
+pub fn get_workout_for_date(
+    date: &str,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<Vec<ExerciseWithSets>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    get_workout_for_date_inner(&conn, date)
+}
+
+pub fn get_workouts_for_range_inner(
+    conn: &rusqlite::Connection,
     from_date: &str,
     to_date: &str,
-    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<Vec<DayWorkout>, String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
             "SELECT w.date, e.id, e.name, c.name, we.exercise_order, we.id,
@@ -181,12 +185,20 @@ pub fn get_workouts_for_range(
 }
 
 #[tauri::command]
-pub fn get_active_dates(
+pub fn get_workouts_for_range(
+    from_date: &str,
+    to_date: &str,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<Vec<DayWorkout>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    get_workouts_for_range_inner(&conn, from_date, to_date)
+}
+
+pub fn get_active_dates_inner(
+    conn: &rusqlite::Connection,
     year: i32,
     month: u32,
-    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<Vec<String>, String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
     let prefix = format!("{}-{:02}", year, month);
     let mut stmt = conn
         .prepare("SELECT DISTINCT date FROM workouts WHERE date LIKE ?1 ORDER BY date")
@@ -200,13 +212,30 @@ pub fn get_active_dates(
 }
 
 #[tauri::command]
+pub fn get_active_dates(
+    year: i32,
+    month: u32,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<Vec<String>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    get_active_dates_inner(&conn, year, month)
+}
+
+#[tauri::command]
 pub fn add_exercise_to_workout(
     date: &str,
     exercise_id: i64,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<i64, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
+    add_exercise_to_workout_inner(&conn, date, exercise_id)
+}
 
+pub fn add_exercise_to_workout_inner(
+    conn: &rusqlite::Connection,
+    date: &str,
+    exercise_id: i64,
+) -> Result<i64, String> {
     let workout_id = conn
         .query_row(
             "SELECT id FROM workouts WHERE date = ?1 AND workout_order = 1",
@@ -244,12 +273,10 @@ pub fn add_exercise_to_workout(
     Ok(conn.last_insert_rowid())
 }
 
-#[tauri::command]
-pub fn remove_exercise_from_workout(
+pub fn remove_exercise_from_workout_inner(
+    conn: &rusqlite::Connection,
     workout_exercise_id: i64,
-    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<(), String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
     let workout_id = conn
         .query_row(
             "SELECT workout_id FROM workout_exercises WHERE id = ?1",
@@ -295,4 +322,13 @@ pub fn remove_exercise_from_workout(
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn remove_exercise_from_workout(
+    workout_exercise_id: i64,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    remove_exercise_from_workout_inner(&conn, workout_exercise_id)
 }
