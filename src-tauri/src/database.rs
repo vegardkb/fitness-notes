@@ -1,6 +1,6 @@
 use crate::models::{Settings, Sex, WeightUnit};
 
-const SCHEMA_VERSION: u32 = 3;
+const SCHEMA_VERSION: u32 = 4;
 
 pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), String> {
     let current = conn
@@ -26,6 +26,12 @@ pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), String> {
     if current < 3 && 3 <= SCHEMA_VERSION {
         migrate_3(conn).map_err(|e| e.to_string())?;
         conn.execute_batch("PRAGMA user_version = 3")
+            .map_err(|e| e.to_string())?;
+    }
+
+    if current < 4 && 4 <= SCHEMA_VERSION {
+        migrate_4(conn).map_err(|e| e.to_string())?;
+        conn.execute_batch("PRAGMA user_version = 4")
             .map_err(|e| e.to_string())?;
     }
 
@@ -251,6 +257,51 @@ fn migrate_3(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
+fn migrate_4(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::error::Error>> {
+    conn.execute_batch(
+        "CREATE TABLE workouts_new (
+            id integer primary key,
+            date text not null,
+            workout_order integer not null default 1
+        );
+        INSERT INTO workouts_new SELECT id, date, 1 FROM workouts;
+        DROP TABLE workouts;
+        ALTER TABLE workouts_new RENAME TO workouts;
+
+        CREATE TABLE workout_exercises_new (
+            id integer primary key,
+            workout_id integer not null references workouts(id),
+            exercise_id integer not null references exercises(id),
+            exercise_order integer not null
+        );
+        INSERT INTO workout_exercises_new
+            SELECT * FROM workout_exercises;
+        DROP TABLE workout_exercises;
+        ALTER TABLE workout_exercises_new RENAME TO workout_exercises;
+
+        CREATE TABLE sets_new (
+            id integer primary key,
+            workout_exercise_id integer not null references workout_exercises(id),
+            exercise_id integer not null references exercises(id),
+            set_order integer not null,
+            weight_kg real not null,
+            reps integer not null,
+            notes text,
+            was_pr_at_time boolean not null,
+            is_current_pr boolean not null
+        );
+        INSERT INTO sets_new
+            SELECT s.id, we.id, s.exercise_id, s.set_order,
+                s.weight_kg, s.reps, s.notes, s.was_pr_at_time, s.is_current_pr
+            FROM sets s
+            JOIN workout_exercises we
+                ON we.workout_id = s.workout_id AND we.exercise_id = s.exercise_id;
+        DROP TABLE sets;
+        ALTER TABLE sets_new RENAME TO sets;",
+    )?;
+    Ok(())
+}
+
 // Recomputes both PR flags for all sets of an exercise.
 // was_pr_at_time: full chronological pass (Pareto frontier of prior sets).
 // is_current_pr: SQL update checking global dominance.
@@ -258,7 +309,8 @@ pub fn recompute_pr_flags(conn: &rusqlite::Connection, exercise_id: i64) -> Resu
     let mut stmt = conn
         .prepare(
             "SELECT s.id, s.weight_kg, s.reps FROM sets s
-             JOIN workouts w ON s.workout_id = w.id
+             JOIN workout_exercises we ON s.workout_exercise_id = we.id
+             JOIN workouts w ON we.workout_id = w.id
              WHERE s.exercise_id = ?1
              ORDER BY w.date ASC, s.set_order ASC",
         )
@@ -289,8 +341,10 @@ pub fn recompute_pr_flags(conn: &rusqlite::Connection, exercise_id: i64) -> Resu
     conn.execute(
         "UPDATE sets SET is_current_pr = NOT EXISTS (
              SELECT 1 FROM sets s2
-             JOIN workouts w2 ON s2.workout_id = w2.id
-             JOIN workouts w1 ON sets.workout_id = w1.id
+             JOIN workout_exercises we2 ON s2.workout_exercise_id = we2.id
+             JOIN workouts w2 ON we2.workout_id = w2.id
+             JOIN workout_exercises we1 ON sets.workout_exercise_id = we1.id
+             JOIN workouts w1 ON we1.workout_id = w1.id
              WHERE s2.exercise_id = sets.exercise_id
                AND s2.id != sets.id
                AND s2.weight_kg >= sets.weight_kg

@@ -76,13 +76,13 @@ pub fn delete_exercise(
     let conn = db.lock().map_err(|e| e.to_string())?;
     let set_count: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM sets WHERE exercise_id = ?1",
+            "SELECT COUNT(*) FROM workout_exercises WHERE exercise_id = ?1",
             rusqlite::params![id],
             |row| row.get(0),
         )
         .map_err(|e| e.to_string())?;
     if set_count > 0 {
-        return Err("Cannot delete exercise with existing sets".to_string());
+        return Err("Cannot delete exercise with existing instances".to_string());
     }
     conn.execute("DELETE FROM exercises WHERE id = ?1", rusqlite::params![id])
         .map_err(|e| e.to_string())?;
@@ -173,15 +173,15 @@ pub fn delete_category(
     let conn = db.lock().map_err(|e| e.to_string())?;
     let set_count: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM sets s
-             JOIN exercises e ON s.exercise_id = e.id
+            "SELECT COUNT(*) FROM workout_exercises we
+             JOIN exercises e ON we.exercise_id = e.id
              WHERE e.category_id = ?1",
             rusqlite::params![id],
             |row| row.get(0),
         )
         .map_err(|e| e.to_string())?;
     if set_count > 0 {
-        return Err("Cannot delete category with existing sets".to_string());
+        return Err("Cannot delete category with existing instances".to_string());
     }
     let exercise_count: i64 = conn
         .query_row(
@@ -209,16 +209,6 @@ pub fn merge_exercise_into_existing(
 ) -> Result<(), String> {
     let mut conn = db.lock().map_err(|e| e.to_string())?;
     let tx = conn.transaction().map_err(|e| e.to_string())?;
-
-    tx.execute(
-        "DELETE FROM workout_exercises
-         WHERE exercise_id = ?1
-           AND workout_id IN (
-             SELECT workout_id FROM workout_exercises WHERE exercise_id = ?2
-           )",
-        rusqlite::params![from_id, to_id],
-    )
-    .map_err(|e| e.to_string())?;
 
     tx.execute(
         "UPDATE workout_exercises SET exercise_id = ?1 WHERE exercise_id = ?2",
@@ -298,13 +288,13 @@ pub fn get_exercise_history(
 
     let mut stmt = conn
         .prepare(
-            "SELECT w.date, e.id, e.name, c.name, we.exercise_order,
+            "SELECT w.date, e.id, e.name, c.name, we.exercise_order, we.id,
                     s.id, s.set_order, s.weight_kg, s.reps, s.notes, s.was_pr_at_time, s.is_current_pr
              FROM workouts w
              JOIN workout_exercises we ON we.workout_id = w.id
              JOIN exercises e ON we.exercise_id = e.id
              JOIN categories c ON e.category_id = c.id
-             JOIN sets s ON s.workout_id = w.id AND s.exercise_id = e.id
+             JOIN sets s ON s.workout_exercise_id = we.id
              WHERE e.id = ?1
              ORDER BY w.date DESC, we.exercise_order, s.set_order",
         )
@@ -320,11 +310,12 @@ pub fn get_exercise_history(
                 row.get::<_, i64>(4)?,
                 row.get::<_, i64>(5)?,
                 row.get::<_, i64>(6)?,
-                row.get::<_, f64>(7)?,
-                row.get::<_, i64>(8)?,
-                row.get::<_, Option<String>>(9)?,
-                row.get::<_, bool>(10)?,
+                row.get::<_, i64>(7)?,
+                row.get::<_, f64>(8)?,
+                row.get::<_, i64>(9)?,
+                row.get::<_, Option<String>>(10)?,
                 row.get::<_, bool>(11)?,
+                row.get::<_, bool>(12)?,
             ))
         })
         .map_err(|e| e.to_string())?;
@@ -337,6 +328,7 @@ pub fn get_exercise_history(
             exercise_name,
             category,
             exercise_order,
+            workout_exercise_id,
             set_id,
             set_order,
             weight_kg,
@@ -373,6 +365,7 @@ pub fn get_exercise_history(
                 exercise_id,
                 exercise_name,
                 category,
+                workout_exercise_id,
                 exercise_order,
                 sets: vec![set],
             }),
@@ -397,7 +390,7 @@ pub fn get_exercise_graph_data(
              FROM workouts w
              JOIN workout_exercises we ON we.workout_id = w.id
              JOIN exercises e ON we.exercise_id = e.id
-             JOIN sets s ON s.workout_id = w.id AND s.exercise_id = e.id
+             JOIN sets s ON s.workout_exercise_id = we.id
              WHERE e.id = ?1 AND w.date BETWEEN ?2 AND ?3
              ORDER BY w.date DESC",
         )
@@ -443,7 +436,7 @@ pub fn get_rep_maxes(
              FROM workouts w
              JOIN workout_exercises we ON we.workout_id = w.id
              JOIN exercises e ON we.exercise_id = e.id
-             JOIN sets s ON s.workout_id = w.id AND s.exercise_id = e.id
+             JOIN sets s ON s.workout_exercise_id = we.id
              WHERE e.id = ?1 AND s.is_current_pr = 1
              ORDER BY s.weight_kg DESC",
         )
@@ -483,7 +476,8 @@ pub fn get_last_set(
     let mut stmt = conn
         .prepare(
             "SELECT s.weight_kg, s.reps FROM sets s
-             JOIN workouts w ON w.id = s.workout_id
+             JOIN workout_exercises we ON we.id = s.workout_exercise_id
+             JOIN workouts w ON w.id = we.workout_id
              WHERE s.exercise_id = ?1
              ORDER BY w.date DESC, s.set_order DESC
              LIMIT 1",

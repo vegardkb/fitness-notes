@@ -17,6 +17,7 @@ pub struct ExerciseWithSets {
     pub exercise_id: i64,
     pub exercise_name: String,
     pub category: String,
+    pub workout_exercise_id: i64,
     pub exercise_order: i64,
     pub sets: Vec<Set>,
 }

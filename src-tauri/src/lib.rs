@@ -13,7 +13,10 @@ use crate::commands::import::{
     parse_fitnotes_csv,
 };
 use crate::commands::sets::{delete_set, reorder_exercises, reorder_sets, upsert_set};
-use crate::commands::workouts::{get_active_dates, get_workout_for_date, get_workouts_for_range};
+use crate::commands::workouts::{
+    add_exercise_to_workout, get_active_dates, get_workout_for_date, get_workouts_for_range,
+    remove_exercise_from_workout,
+};
 
 use tauri::Manager;
 
@@ -30,6 +33,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            add_exercise_to_workout,
+            remove_exercise_from_workout,
             get_active_dates,
             get_workout_for_date,
             upsert_set,

@@ -1,4 +1,5 @@
 use crate::database;
+use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 
 #[tauri::command]
@@ -156,6 +157,8 @@ pub fn import_fitnotes_rows(
         std::collections::HashMap::new();
     let mut set_order_counter: std::collections::HashMap<(i64, i64), i64> =
         std::collections::HashMap::new();
+    let mut workout_exercise_to_id: std::collections::HashMap<(i64, i64), i64> =
+        std::collections::HashMap::new();
     let mut affected_exercises: std::collections::HashSet<i64> = std::collections::HashSet::new();
     let mut workouts_touched: std::collections::HashSet<i64> = std::collections::HashSet::new();
     let mut sets_imported: i64 = 0;
@@ -199,51 +202,67 @@ pub fn import_fitnotes_rows(
         let workout_id = if let Some(&wid) = date_to_workout.get(&row.date) {
             wid
         } else {
-            conn.execute(
-                "INSERT OR IGNORE INTO workouts (date) VALUES (?1)",
-                rusqlite::params![row.date],
-            )
-            .map_err(|e| e.to_string())?;
-            let wid: i64 = conn
+            let wid = conn
                 .query_row(
-                    "SELECT id FROM workouts WHERE date = ?1",
+                    "SELECT id FROM workouts WHERE date = ?1 AND workout_order = 1",
                     rusqlite::params![row.date],
-                    |r| r.get(0),
+                    |r| r.get::<_, i64>(0),
                 )
+                .optional()
                 .map_err(|e| e.to_string())?;
+
+            let wid = match wid {
+                Some(wid) => wid,
+                None => {
+                    conn.execute(
+                        "INSERT INTO workouts (date, workout_order) VALUES (?1, 1)",
+                        rusqlite::params![row.date],
+                    )
+                    .map_err(|e| e.to_string())?;
+                    conn.last_insert_rowid()
+                }
+            };
             date_to_workout.insert(row.date.clone(), wid);
             workouts_touched.insert(wid);
             wid
         };
 
         // 3. Find or create workout_exercises entry
-        let next_ex_order: i64 = conn
-            .query_row(
-                "SELECT COALESCE(MAX(exercise_order), 0) + 1 FROM workout_exercises WHERE workout_id = ?1",
-                rusqlite::params![workout_id],
-                |r| r.get(0),
+        let key = (workout_id, exercise_id);
+        let workout_exercise_id = if let Some(id) = workout_exercise_to_id.get(&key) {
+            *id
+        } else {
+            let next_ex_order: i64 = conn
+                .query_row(
+                    "SELECT COALESCE(MAX(exercise_order), 0) + 1 FROM workout_exercises WHERE workout_id = ?1",
+                    rusqlite::params![workout_id],
+                    |r| r.get(0),
+                )
+                .map_err(|e| e.to_string())?;
+            conn.execute(
+                "INSERT INTO workout_exercises (workout_id, exercise_id, exercise_order) VALUES (?1, ?2, ?3)",
+                rusqlite::params![workout_id, exercise_id, next_ex_order],
             )
             .map_err(|e| e.to_string())?;
-        conn.execute(
-            "INSERT OR IGNORE INTO workout_exercises (workout_id, exercise_id, exercise_order) VALUES (?1, ?2, ?3)",
-            rusqlite::params![workout_id, exercise_id, next_ex_order],
-        )
-        .map_err(|e| e.to_string())?;
+            let weid = conn.last_insert_rowid();
+            workout_exercise_to_id.insert(key, weid);
+            weid
+        };
 
         // 4. Insert set
-        let key = (workout_id, exercise_id);
+        let key = (workout_exercise_id, exercise_id);
         let set_order = set_order_counter.entry(key).or_insert_with(|| {
             conn.query_row(
-                "SELECT COALESCE(MAX(set_order), 0) + 1 FROM sets WHERE workout_id = ?1 AND exercise_id = ?2",
-                rusqlite::params![workout_id, exercise_id],
+                "SELECT COALESCE(MAX(set_order), 0) + 1 FROM sets WHERE workout_exercise_id = ?1 AND exercise_id = ?2",
+                rusqlite::params![workout_exercise_id, exercise_id],
                 |r| r.get(0),
             )
             .unwrap_or(1)
         });
         conn.execute(
-            "INSERT INTO sets (workout_id, exercise_id, set_order, weight_kg, reps, notes, was_pr_at_time, is_current_pr)
+            "INSERT INTO sets (workout_exercise_id, exercise_id, set_order, weight_kg, reps, notes, was_pr_at_time, is_current_pr)
             VALUES (?1, ?2, ?3, ?4, ?5, NULL, 0, 0)",
-            rusqlite::params![workout_id, exercise_id, *set_order, row.weight_kg, row.reps],
+            rusqlite::params![workout_exercise_id, exercise_id, *set_order, row.weight_kg, row.reps],
         )
         .map_err(|e| e.to_string())?;
         *set_order += 1;
