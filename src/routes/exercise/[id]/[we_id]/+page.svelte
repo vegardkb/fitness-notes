@@ -3,14 +3,19 @@
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
     import { dndzone } from "svelte-dnd-action";
-    import type { Set, ExerciseWithSets, SetMinimal } from "$lib/exercise";
+    import type {
+        Set,
+        WorkoutExerciseContext,
+        SetMinimal,
+    } from "$lib/exercise";
     import { formatWeight } from "$lib/exercise";
     import { SquareMinus, SquarePlus, GripVertical } from "lucide-svelte";
 
-    const exerciseId = $derived(Number(page.params.id ?? "0"));
-    const date = $derived(page.params.date ?? "");
+    const workoutExerciseId = $derived(Number(page.params.we_id ?? "0"));
+    const exerciseId = $derived(Number(page.params.id));
 
     let sets = $state<Set[]>([]);
+    let date = $state<string>("");
     let weightInput: number = $state(NaN);
     let repsInput: number = $state(NaN);
     let adding = $state(false);
@@ -37,21 +42,30 @@
     }
 
     async function refreshSets() {
-        const workout = await invoke<ExerciseWithSets[]>(
-            "get_workout_for_date",
-            { date },
-        );
-        sets = workout.find((e) => e.exercise_id === exerciseId)?.sets ?? [];
+        const setsData = await invoke<Set[]>("get_sets_for_workout_exercise", {
+            workoutExerciseId: workoutExerciseId,
+        });
+        sets = setsData;
     }
 
     onMount(async () => {
-        const [workout, lastSetData] = await Promise.all([
-            invoke<ExerciseWithSets[]>("get_workout_for_date", { date }),
-            invoke<SetMinimal>("get_last_set", { exerciseId }),
-        ]);
+        console.log(date);
+        const setsData = await invoke<Set[]>("get_sets_for_workout_exercise", {
+            workoutExerciseId: workoutExerciseId,
+        });
+        const lastSetData = await invoke<SetMinimal | null>("get_last_set", {
+            exerciseId: exerciseId,
+        });
+        const weContext = await invoke<WorkoutExerciseContext>(
+            "get_workout_exercise_context",
+            {
+                workoutExerciseId: workoutExerciseId,
+            },
+        );
 
-        lastSet = lastSetData;
-        sets = workout.find((e) => e.exercise_id === exerciseId)?.sets ?? [];
+        sets = setsData;
+        if (lastSetData) lastSet = lastSetData;
+        date = weContext.date;
         defaultToLastSet();
     });
 
@@ -61,13 +75,13 @@
         try {
             await invoke<Set>("upsert_set", {
                 id: set_selected?.id ?? null,
-                date,
-                exerciseId,
+                workoutExerciseId: workoutExerciseId,
                 weightKg: weightInput,
                 reps: repsInput,
                 notes: null,
             });
             set_selected = null;
+            lastSet = { weight: weightInput, reps: repsInput };
             await refreshSets();
             defaultToLastSet();
         } finally {
@@ -90,7 +104,7 @@
     function handleSetFinalize(e: CustomEvent) {
         sets = e.detail.items;
         invoke("reorder_sets", {
-            exerciseId,
+            workoutExerciseId,
             orderedSetIds: sets.map((s) => s.id),
         }).then(() => refreshSets());
     }
@@ -112,7 +126,9 @@
                     class:list-item--selected={set_selected?.id === set.id}
                     onclick={() => selectSet(set)}
                 >
-                    <span class="drag-handle"><GripVertical size={16} strokeWidth={1.5} /></span>
+                    <span class="drag-handle"
+                        ><GripVertical size={16} strokeWidth={1.5} /></span
+                    >
                     <span class="set-stats">
                         <span class="stat-val stat-val--weight"
                             >{formatWeight(set.weight_kg)}</span
@@ -146,7 +162,8 @@
                     <input type="number" bind:value={weightInput} />
                     <button
                         class="body-btn"
-                        onclick={() => (weightInput += 2.5)}><SquarePlus size={20} strokeWidth={1.5} /></button
+                        onclick={() => (weightInput += 2.5)}
+                        ><SquarePlus size={20} strokeWidth={1.5} /></button
                     >
                 </div>
             </div>

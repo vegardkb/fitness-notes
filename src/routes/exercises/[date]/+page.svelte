@@ -163,8 +163,17 @@
         }
     }
 
-    function selectExercise(exercise: Exercise) {
-        goto(`/exercise/${exercise.id}/${date}`, { replaceState: true });
+    async function selectExercise(exercise: Exercise) {
+        let workout_exercise_id = await invoke<number>(
+            "add_exercise_to_workout",
+            {
+                date: date,
+                exerciseId: exercise.id,
+            },
+        );
+        goto(`/exercise/${exercise.id}/${workout_exercise_id}`, {
+            replaceState: true,
+        });
     }
 
     const categoryActions = [

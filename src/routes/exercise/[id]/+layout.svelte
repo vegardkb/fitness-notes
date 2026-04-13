@@ -3,16 +3,20 @@
     import { onMount } from "svelte";
     import { invoke } from "@tauri-apps/api/core";
     import ExerciseHeader from "$lib/ExerciseHeader.svelte";
-    import type { Exercise } from "$lib/exercise";
+    import type { WorkoutExerciseContext } from "$lib/exercise";
     import { exerciseHrefs } from "$lib/exercise";
 
     let { children } = $props();
 
-    const date = $derived(
-        page.params.date ?? page.url.searchParams.get("from") ?? "",
-    );
-    const exerciseId = $derived(Number(page.params.id));
+    let exerciseId = $derived(Number(page.params.id));
+    let workoutExerciseContext: WorkoutExerciseContext = $state({
+        exercise_name: "",
+        date: "",
+    });
 
+    const workoutExerciseId = $derived(
+        Number(page.params.we_id ?? page.url.searchParams.get("from") ?? 0),
+    );
     const activeTab = $derived(
         page.route.id?.endsWith("/history")
             ? "history"
@@ -23,15 +27,25 @@
                 : "sets",
     );
 
-    const hrefs = $derived(exerciseHrefs(exerciseId, date));
+    const hrefs = $derived(
+        exerciseHrefs(
+            exerciseId,
+            workoutExerciseId,
+            workoutExerciseContext.date,
+        ),
+    );
 
-    let exerciseName: string = $state("");
+    let exerciseName: string = $derived(workoutExerciseContext.exercise_name);
+    let date: string = $derived(workoutExerciseContext.date);
 
     onMount(async () => {
-        const exercise = await invoke<Exercise>("get_exercise", {
-            id: exerciseId,
-        });
-        exerciseName = exercise.name;
+        workoutExerciseContext = await invoke<WorkoutExerciseContext>(
+            "get_workout_exercise_context",
+            {
+                workoutExerciseId,
+            },
+        );
+        console.log(workoutExerciseContext);
     });
 </script>
 

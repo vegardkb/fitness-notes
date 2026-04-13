@@ -4,7 +4,9 @@ use crate::commands::exercises::{
     list_exercises_in_category_inner,
 };
 use crate::commands::sets::upsert_set_inner;
-use crate::commands::workouts::{add_exercise_to_workout_inner, get_active_dates_inner};
+use crate::commands::workouts::{
+    add_exercise_to_workout_inner, get_active_dates_inner, get_sets_for_workout_exercise_inner,
+};
 
 #[test]
 fn test_add_three_sets_on_two_days() {
@@ -15,6 +17,9 @@ fn test_add_three_sets_on_two_days() {
     let exercise = &exercises[0];
     let workout_exercise_id =
         add_exercise_to_workout_inner(&conn, "2024-01-01", exercise.id).unwrap();
+
+    let sets = get_sets_for_workout_exercise_inner(&conn, workout_exercise_id).unwrap();
+    assert_eq!(sets.len(), 0);
 
     upsert_set_inner(&conn, None, workout_exercise_id, 100.0, 10, None).unwrap();
     upsert_set_inner(&conn, None, workout_exercise_id, 110.0, 5, None).unwrap();

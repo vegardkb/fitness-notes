@@ -362,6 +362,10 @@ h1,
     overflow: hidden;
 }
 
+.exercise-card.selected {
+    border: 2px solid var(--accent);
+}
+
 .exercise-card-header {
     display: flex;
     align-items: center;
@@ -375,6 +379,8 @@ h1,
     font-weight: 500;
     text-align: left;
     transition: background var(--dur-fast) var(--easing);
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .exercise-card-header:active {
@@ -795,6 +801,19 @@ h1,
 .day-label {
     font-size: var(--text-lg);
     font-weight: 600;
+}
+
+.selection-bar {
+    position: fixed;
+    bottom: env(safe-area-inset-bottom, 0px);
+    left: 0;
+    right: 0;
+    z-index: var(--z-header);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem;
 }
 
 /* Shared inline compact button base */

@@ -258,8 +258,11 @@ fn migrate_3(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::error::Erro
 }
 
 fn migrate_4(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::error::Error>> {
+    conn.execute_batch("PRAGMA foreign_keys = OFF;")?;
     conn.execute_batch(
-        "CREATE TABLE workouts_new (
+        "
+        BEGIN;
+        CREATE TABLE workouts_new (
             id integer primary key,
             date text not null,
             workout_order integer not null default 1
@@ -297,8 +300,10 @@ fn migrate_4(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::error::Erro
             JOIN workout_exercises we
                 ON we.workout_id = s.workout_id AND we.exercise_id = s.exercise_id;
         DROP TABLE sets;
-        ALTER TABLE sets_new RENAME TO sets;",
+        ALTER TABLE sets_new RENAME TO sets;
+        COMMIT;",
     )?;
+    conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     Ok(())
 }
 
@@ -312,7 +317,7 @@ pub fn recompute_pr_flags(conn: &rusqlite::Connection, exercise_id: i64) -> Resu
              JOIN workout_exercises we ON s.workout_exercise_id = we.id
              JOIN workouts w ON we.workout_id = w.id
              WHERE s.exercise_id = ?1
-             ORDER BY w.date ASC, s.set_order ASC",
+             ORDER BY w.date ASC, we.exercise_order ASC, s.set_order ASC",
         )
         .map_err(|e| e.to_string())?;
 
@@ -353,7 +358,10 @@ pub fn recompute_pr_flags(conn: &rusqlite::Connection, exercise_id: i64) -> Resu
                    s2.weight_kg > sets.weight_kg
                    OR s2.reps > sets.reps
                    OR w2.date < w1.date
-                   OR (w2.date = w1.date AND s2.set_order < sets.set_order)
+                   OR (w2.date = w1.date AND (
+                        we2.exercise_order < we1.exercise_order
+                        OR (we2.exercise_order = we1.exercise_order AND s2.set_order < sets.set_order))
+                    )
                )
          )
          WHERE exercise_id = ?1",

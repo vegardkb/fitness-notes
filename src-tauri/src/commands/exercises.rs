@@ -2,6 +2,7 @@ use crate::database::recompute_pr_flags;
 use crate::models::{
     Category, DatedValue, DayWorkout, Exercise, ExerciseWithSets, RepMax, Set, SetMinimal,
 };
+use rusqlite::OptionalExtension;
 
 pub fn list_exercise_categories_inner(
     conn: &rusqlite::Connection,
@@ -558,7 +559,7 @@ pub fn get_rep_maxes(
 pub fn get_last_set_inner(
     conn: &rusqlite::Connection,
     exercise_id: i64,
-) -> Result<SetMinimal, String> {
+) -> Result<Option<SetMinimal>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT s.weight_kg, s.reps FROM sets s
@@ -574,18 +575,20 @@ pub fn get_last_set_inner(
         .query_row(rusqlite::params![exercise_id], |row| {
             Ok((row.get::<_, f64>(0)?, row.get::<_, i64>(1)?))
         })
+        .optional()
         .map_err(|e| e.to_string())?;
 
-    let (weight, reps) = row;
-
-    Ok(SetMinimal { weight, reps })
+    match row {
+        Some((weight, reps)) => Ok(Some(SetMinimal { weight, reps })),
+        None => Ok(None),
+    }
 }
 
 #[tauri::command]
 pub fn get_last_set(
     exercise_id: i64,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<SetMinimal, String> {
+) -> Result<Option<SetMinimal>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     get_last_set_inner(&conn, exercise_id)
 }

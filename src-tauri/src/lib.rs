@@ -14,8 +14,9 @@ use crate::commands::import::{
 };
 use crate::commands::sets::{delete_set, reorder_exercises, reorder_sets, upsert_set};
 use crate::commands::workouts::{
-    add_exercise_to_workout, get_active_dates, get_workout_for_date, get_workouts_for_range,
-    remove_exercise_from_workout,
+    add_exercise_to_workout, get_active_dates, get_sets_for_workout_exercise,
+    get_workout_exercise_context, get_workout_for_date, get_workouts_for_range,
+    merge_workout_exercises, remove_exercise_from_workout,
 };
 
 use tauri::Manager;
@@ -30,6 +31,7 @@ mod tests;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_haptics::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             initialize_db(app)?;
@@ -38,8 +40,11 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             add_exercise_to_workout,
             remove_exercise_from_workout,
+            merge_workout_exercises,
             get_active_dates,
             get_workout_for_date,
+            get_workout_exercise_context,
+            get_sets_for_workout_exercise,
             upsert_set,
             delete_set,
             get_exercise_history,

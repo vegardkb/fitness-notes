@@ -58,6 +58,12 @@ pub struct RepMax {
     pub weight_kg: f64,
 }
 
+#[derive(Serialize)]
+pub struct WorkoutExerciseContext {
+    pub exercise_name: String,
+    pub date: String,
+}
+
 pub struct Settings {
     pub height: i64,
     pub unit: WeightUnit,

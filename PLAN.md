@@ -9,6 +9,7 @@
 - **Settings** (`/settings`): FitNotes exercise CSV import wizard, FitNotes Body Tracker CSV import wizard (resolve unknowns: create/map/skip), delete all data
 - **Light/dark mode**: CSS variables defined; `dark_mode` stored in DB but not yet wired to the UI
 - **Exercise/category management** (`/exercises/[date]`): Category → exercise drill-down, full CRUD (create, rename, delete, merge) for both categories and exercises via inline inputs and ⋯ context menus. Merge moves all sets/history to the target and recomputes PRs. Errors surface as toasts.
+- **Workout/exercise model refactor**: Migration v4 — `workout_order` added to `workouts`, unique constraints removed from `workouts.date` and `workout_exercises(workout_id, exercise_id)`, `sets` now references `workout_exercise_id` FK with `exercise_id` kept denormalized. Route is `/exercise/[id]/[we_id]` (deviation from plan: `exercise_id` kept in URL so history/graph/prs sub-routes can resolve it via the shared `[id]` layout without an extra lookup). Long-press select mode in DayCard allows merge and delete of `workout_exercise` instances. `reorder_exercises` recomputes PR flags after reorder.
 - **Migration infrastructure**: `run_migrations()` in `database.rs` with downgrade guard and per-version functions. WAL mode enabled at startup. Automatic daily backups (last 14 kept) on every launch.
 - **Android build & deploy**: App runs on Android via Tauri. Touch targets, DnD, viewport, and file picker verified. Daily iteration via `pnpm tauri android dev` (USB, HMR). Release builds signed via keystore env vars; `deploy.sh` builds and installs in one step.
 
@@ -29,28 +30,28 @@ exercises (
 )
 
 workouts (
-    id   integer primary key,
-    date text not null unique
+    id            integer primary key,
+    date          text not null,
+    workout_order integer not null default 1
 )
 
 workout_exercises (
     id             integer primary key,
     workout_id     integer not null references workouts(id),
     exercise_id    integer not null references exercises(id),
-    exercise_order integer not null,
-    unique (workout_id, exercise_id)
+    exercise_order integer not null
 )
 
 sets (
-    id              integer primary key,
-    workout_id      integer not null references workouts(id),
-    exercise_id     integer not null references exercises(id),
-    set_order       integer not null,
-    weight_kg       real not null,
-    reps            integer not null,
-    notes           text,
-    was_pr_at_time  boolean not null,
-    is_current_pr   boolean not null
+    id                  integer primary key,
+    workout_exercise_id integer not null references workout_exercises(id),
+    exercise_id         integer not null references exercises(id),  -- denormalized for fast PR queries
+    set_order           integer not null,
+    weight_kg           real not null,
+    reps                integer not null,
+    notes               text,
+    was_pr_at_time      boolean not null,
+    is_current_pr       boolean not null
 )
 
 body_metrics (
@@ -87,7 +88,6 @@ user_settings (
 
 Pending migrations to add as features land:
 ```
-v4: Schema refactor — recreate workouts, workout_exercises, sets (see section 5)
 v5: ALTER TABLE user_settings ADD COLUMN season_start TEXT DEFAULT '01-01'
 v6: ALTER TABLE user_settings ADD COLUMN use_seasons BOOLEAN DEFAULT true
 v7: ALTER TABLE sets ADD COLUMN is_season_pr BOOLEAN DEFAULT false
@@ -96,281 +96,7 @@ v8: CREATE TABLE templates / template_exercises / planned_sets
 
 ---
 
-### 5. Workout/exercise model refactor
-
-**Problem**: Two constraints limit what the app can represent:
-- `workouts.date` is `UNIQUE` — only one workout per day
-- `workout_exercises` has `UNIQUE(workout_id, exercise_id)` — an exercise can only appear once per workout, making A→B→A structure impossible
-- `sets` references `(workout_id, exercise_id)` as a composite rather than a specific exercise instance — there is no first-class "exercise instance with no sets", which makes templates awkward (applying a template would require dummy sets)
-
-**Scope**: Remove both unique constraints, migrate `sets` to reference a `workout_exercise_id` FK, and keep `exercise_id` on `sets` as a denormalized column for fast PR queries. Multiple workouts per day is intentionally deferred — the schema will support it, but the frontend will not expose it yet (see end of document).
-
-#### Schema changes (migration v4)
-
-Three tables must be recreated — SQLite cannot drop constraints in-place:
-
-```sql
--- workouts: add workout_order, drop unique on date
-CREATE TABLE workouts_new (
-    id        integer primary key,
-    date      text not null,
-    workout_order integer not null default 1
-);
-INSERT INTO workouts_new SELECT id, date, 1 FROM workouts;
-DROP TABLE workouts; ALTER TABLE workouts_new RENAME TO workouts;
-
--- workout_exercises: drop unique(workout_id, exercise_id)
-CREATE TABLE workout_exercises_new (
-    id             integer primary key,
-    workout_id     integer not null references workouts(id),
-    exercise_id    integer not null references exercises(id),
-    exercise_order integer not null
-);
-INSERT INTO workout_exercises_new SELECT * FROM workout_exercises;
-DROP TABLE workout_exercises; ALTER TABLE workout_exercises_new RENAME TO workout_exercises;
-
--- sets: replace (workout_id, exercise_id) with workout_exercise_id
--- exercise_id kept denormalized for fast PR queries (WHERE exercise_id = ?)
-CREATE TABLE sets_new (
-    id                  integer primary key,
-    workout_exercise_id integer not null references workout_exercises(id),
-    exercise_id         integer not null references exercises(id),
-    set_order           integer not null,
-    weight_kg           real not null,
-    reps                integer not null,
-    notes               text,
-    was_pr_at_time      boolean not null,
-    is_current_pr       boolean not null
-);
-INSERT INTO sets_new
-    SELECT s.id, we.id, s.exercise_id, s.set_order,
-           s.weight_kg, s.reps, s.notes, s.was_pr_at_time, s.is_current_pr
-    FROM sets s
-    JOIN workout_exercises we
-      ON we.workout_id = s.workout_id AND we.exercise_id = s.exercise_id;
-DROP TABLE sets; ALTER TABLE sets_new RENAME TO sets;
-```
-
-#### Backend changes (`src-tauri/src/`)
-
-New command:
-- `add_exercise_to_workout(date, exercise_id) → workout_exercise_id` — finds or creates the workout for `date` (workout_order=1), inserts a `workout_exercises` row, and returns its id; the frontend calls this when adding an exercise to a day
-- `remove_exercise_from_workout(workout_exercise_id) → ()` — removes a 'workout_exercises' row; deletes all sets with workout_exercise_id; deletes workout if no exercises remain;
-
-Changed commands in `sets.rs`:
-- `upsert_set` — takes `workout_exercise_id` instead of `(date, exercise_id)`; set_order MAX query scoped to `workout_exercise_id`
-- `delete_set` — cleanup uses `workout_exercise_id` to decide whether to remove the `workout_exercises` row
-- `reorder_sets` — scope changes from `(workout_id, exercise_id)` to `workout_exercise_id`
-
-Changed commands in `workouts.rs`:
-- `get_workout_for_date` — return type adds `workout_exercise_id` to each `ExerciseWithSets`
-- `get_workouts_for_range` — same join change
-- `get_active_dates` — add explicit `DISTINCT` on date (previously implicit from unique constraint)
-- `reorder_exercises` — takes `workout_id` instead of `date` (date is no longer a unique workout key)
-
-Changed commands in `exercises.rs`:
-- `get_exercise_history`, `get_exercise_graph_data`, `get_rep_maxes`, `get_last_set` — join structure changes; queries using denormalized `sets.exercise_id` are unchanged
-- `merge_exercise_into_existing` — `UPDATE sets SET exercise_id = ?` plus `UPDATE workout_exercises SET exercise_id = ?`
-- `delete_exercise`, `delete_category` — validation COUNT queries unchanged (use denorm `sets.exercise_id`)
-
-Changed command in `import.rs`:
-- `import_fitnotes_rows` — workout lookup changes from `INSERT OR IGNORE` (relied on unique date constraint) to `SELECT id FROM workouts WHERE date = ? AND workout_order = 1`; set insertion uses `workout_exercise_id`
-
-#### Frontend changes (`src/`)
-
-**Route rename**: `src/routes/exercise/[id]/[date]/` → `src/routes/exercise/[workout_exercise_id]/`
-The `(exercise_id, date)` pair is no longer a unique identifier once exercises can repeat within a day. `workout_exercise_id` uniquely identifies an exercise instance. Human-readable context (date, name) is loaded from `get_workout_for_date`.
-
-**`src/lib/exercise.ts`**:
-- `ExerciseWithSets` gains `workout_exercise_id: number`
-- `Set` drops `workout_id`
-
-**`src/lib/DayCard.svelte`**:
-- Navigation: `goto(/exercise/${ex.exercise_id}/${date})` → `goto(/exercise/${ex.workout_exercise_id})`
-- Adding an exercise: call `add_exercise_to_workout` to get `workout_exercise_id` before navigating
-- `reorder_exercises` passes `workout_id` instead of `date`
-
-**`src/routes/exercise/[workout_exercise_id]/+page.svelte`**:
-- `upsert_set` and `reorder_sets` pass `workout_exercise_id`
-- Exercise context (name, date) resolved from `workout_exercise_id` via the workout data
-
----
-
-### Backend tests
-
-No external test framework needed — `cargo test` in `src-tauri/` runs everything.
-
-#### Directory structure
-
-```
-src-tauri/src/
-  tests/
-    mod.rs          ← declares test modules; shared helpers (test_db, seed helpers)
-    pr_flags.rs     ← recompute_pr_flags edge cases
-    migrations.rs   ← run_migrations idempotency, schema shape after each version
-    sets.rs         ← upsert_set / delete_set / reorder_sets
-    workouts.rs     ← add/remove exercise, get_workout_for_date
-```
-
-Declare in `lib.rs`:
-
-```rust
-#[cfg(test)]
-mod tests;
-```
-
-#### The core friction: `tauri::State`
-
-Command handlers take `tauri::State<Mutex<Connection>>`, which cannot be constructed outside a running Tauri app. The fix is to extract the real logic into plain inner functions that take `&Connection`, and make each Tauri command a thin wrapper:
-
-```rust
-// The testable function — no Tauri dependency
-pub fn upsert_set_inner(
-    conn: &rusqlite::Connection,
-    id: Option<i64>,
-    workout_exercise_id: i64,
-    weight_kg: f64,
-    reps: i64,
-    notes: Option<String>,
-) -> Result<Set, String> {
-    // ... all the current logic
-}
-
-// The Tauri command becomes a one-liner
-#[tauri::command]
-pub fn upsert_set(
-    id: Option<i64>,
-    workout_exercise_id: i64,
-    weight_kg: f64,
-    reps: i64,
-    notes: Option<String>,
-    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<Set, String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
-    upsert_set_inner(&conn, id, workout_exercise_id, weight_kg, reps, notes)
-}
-```
-
-`recompute_pr_flags` and `run_migrations` already take `&Connection` — they are testable today without any refactoring.
-
-#### Shared helpers in `tests/mod.rs`
-
-```rust
-pub fn test_db() -> rusqlite::Connection {
-    let conn = rusqlite::Connection::open_in_memory().unwrap();
-    crate::database::run_migrations(&conn).unwrap();
-    conn
-}
-
-// Insert a minimal workout + exercise instance; returns (workout_exercise_id, exercise_id)
-pub fn seed_exercise(conn: &rusqlite::Connection, date: &str) -> (i64, i64) {
-    conn.execute("INSERT INTO workouts (date, workout_order) VALUES (?1, 1)", [date]).unwrap();
-    let workout_id = conn.last_insert_rowid();
-    let exercise_id: i64 = conn.query_row(
-        "SELECT id FROM exercises LIMIT 1", [], |r| r.get(0)
-    ).unwrap();
-    conn.execute(
-        "INSERT INTO workout_exercises (workout_id, exercise_id, exercise_order) VALUES (?1, ?2, 1)",
-        [workout_id, exercise_id],
-    ).unwrap();
-    (conn.last_insert_rowid(), exercise_id)
-}
-
-pub fn insert_set(conn: &rusqlite::Connection, we_id: i64, exercise_id: i64, order: i64, weight: f64, reps: i64) -> i64 {
-    conn.execute(
-        "INSERT INTO sets (workout_exercise_id, exercise_id, set_order, weight_kg, reps, notes, was_pr_at_time, is_current_pr)
-         VALUES (?1, ?2, ?3, ?4, ?5, NULL, 0, 0)",
-        rusqlite::params![we_id, exercise_id, order, weight, reps],
-    ).unwrap();
-    conn.last_insert_rowid()
-}
-```
-
-#### Example: PR flag tests in `tests/pr_flags.rs`
-
-```rust
-use crate::database::recompute_pr_flags;
-use super::{test_db, seed_exercise, insert_set};
-
-#[test]
-fn first_set_is_pr() {
-    let conn = test_db();
-    let (we_id, ex_id) = seed_exercise(&conn, "2026-01-01");
-    let set_id = insert_set(&conn, we_id, ex_id, 1, 100.0, 5);
-    recompute_pr_flags(&conn, ex_id).unwrap();
-    let (was, is): (bool, bool) = conn.query_row(
-        "SELECT was_pr_at_time, is_current_pr FROM sets WHERE id = ?1", [set_id], |r| Ok((r.get(0)?, r.get(1)?))
-    ).unwrap();
-    assert!(was);
-    assert!(is);
-}
-
-#[test]
-fn heavier_set_supersedes_lighter() {
-    let conn = test_db();
-    let (we1, ex_id) = seed_exercise(&conn, "2026-01-01");
-    let (we2, _)     = seed_exercise(&conn, "2026-01-08");
-    let s1 = insert_set(&conn, we1, ex_id, 1, 80.0, 5);
-    let s2 = insert_set(&conn, we2, ex_id, 1, 100.0, 5);
-    recompute_pr_flags(&conn, ex_id).unwrap();
-    let is_pr_s1: bool = conn.query_row("SELECT is_current_pr FROM sets WHERE id = ?1", [s1], |r| r.get(0)).unwrap();
-    let is_pr_s2: bool = conn.query_row("SELECT is_current_pr FROM sets WHERE id = ?1", [s2], |r| r.get(0)).unwrap();
-    assert!(!is_pr_s1, "lighter set should no longer be current PR");
-    assert!(is_pr_s2);
-}
-
-#[test]
-fn pareto_frontier_both_sets_are_prs() {
-    // 100kg×1 and 60kg×10 are incomparable — both should be current PRs
-    let conn = test_db();
-    let (we1, ex_id) = seed_exercise(&conn, "2026-01-01");
-    let (we2, _)     = seed_exercise(&conn, "2026-01-08");
-    let s1 = insert_set(&conn, we1, ex_id, 1, 100.0, 1);
-    let s2 = insert_set(&conn, we2, ex_id, 1, 60.0, 10);
-    recompute_pr_flags(&conn, ex_id).unwrap();
-    let is_pr_s1: bool = conn.query_row("SELECT is_current_pr FROM sets WHERE id = ?1", [s1], |r| r.get(0)).unwrap();
-    let is_pr_s2: bool = conn.query_row("SELECT is_current_pr FROM sets WHERE id = ?1", [s2], |r| r.get(0)).unwrap();
-    assert!(is_pr_s1);
-    assert!(is_pr_s2);
-}
-
-#[test]
-fn duplicate_set_only_first_is_pr() {
-    // Two identical (weight, reps) — chronologically first should be the PR
-    let conn = test_db();
-    let (we1, ex_id) = seed_exercise(&conn, "2026-01-01");
-    let (we2, _)     = seed_exercise(&conn, "2026-01-08");
-    let s1 = insert_set(&conn, we1, ex_id, 1, 100.0, 5);
-    let s2 = insert_set(&conn, we2, ex_id, 1, 100.0, 5);
-    recompute_pr_flags(&conn, ex_id).unwrap();
-    let is_pr_s1: bool = conn.query_row("SELECT is_current_pr FROM sets WHERE id = ?1", [s1], |r| r.get(0)).unwrap();
-    let is_pr_s2: bool = conn.query_row("SELECT is_current_pr FROM sets WHERE id = ?1", [s2], |r| r.get(0)).unwrap();
-    assert!(is_pr_s1,  "first set should be the PR");
-    assert!(!is_pr_s2, "duplicate later set should not be a PR");
-}
-```
-
-#### Example: migration test in `tests/migrations.rs`
-
-```rust
-#[test]
-fn migrations_are_idempotent() {
-    let conn = super::test_db();
-    // Running migrations again on an already-migrated DB must not error
-    crate::database::run_migrations(&conn).unwrap();
-}
-
-#[test]
-fn schema_version_is_current() {
-    let conn = super::test_db();
-    let version: u32 = conn.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap();
-    assert_eq!(version, 4); // bump this when SCHEMA_VERSION changes
-}
-```
-
----
-
-### 6. Settings menu
+### 5. Settings menu
 
 The `/settings` page currently only has import and delete-all. Expose the user profile stored in `user_settings`.
 
@@ -569,7 +295,7 @@ New Rust commands:
 5. ~~**Body metrics overhaul**~~ ✓ done — is_derived, FitNotes renames, on-the-fly derived metrics, write guard in upsert
 6. ~~**Body measurements import**~~ ✓ done
 7. ~~**Android build/test workflow**~~ ✓ done — `tauri android dev` for iteration, `deploy.sh` for release
-8. **Workout/exercise model refactor** — workout_exercise_id, exercise repetition, template foundation
+8. ~~**Workout/exercise model refactor**~~ ✓ done — workout_exercise_id, exercise repetition, merge/delete via select mode, backend tests
 9. **Settings menu** — user profile, dark mode, manual export/restore
 10. **Complete body tracker** (graph + PRs)
 11. **Workout templates** — depends on refactor (section 8)

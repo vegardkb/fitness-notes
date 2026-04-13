@@ -1,5 +1,6 @@
 use crate::database::recompute_pr_flags;
 use crate::models::Set;
+use std::collections::HashSet;
 
 pub fn upsert_set_inner(
     conn: &rusqlite::Connection,
@@ -157,6 +158,17 @@ pub fn reorder_exercises_inner(
             rusqlite::params![i as i64 + 1, workout_exercise_id],
         )
         .map_err(|e| e.to_string())?;
+    }
+    let we_ids: HashSet<i64> = ordered_workout_exercise_ids.into_iter().collect();
+    for we_id in we_ids {
+        let exercise_id = conn
+            .query_row(
+                "SELECT exercise_id FROM workout_exercises WHERE id = ?",
+                rusqlite::params![we_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        recompute_pr_flags(conn, exercise_id)?;
     }
     Ok(())
 }

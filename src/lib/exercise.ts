@@ -23,6 +23,7 @@ export type RepMax = {
 
 export type ExerciseWithSets = {
   id: number; // alias of exercise_id, required by dndzone
+  workout_exercise_id: number;
   exercise_id: number;
   exercise_name: string;
   sets: Set[];
@@ -43,18 +44,25 @@ export type DayWorkout = {
   exercises: ExerciseWithSets[];
 };
 
+export type WorkoutExerciseContext = {
+  exercise_name: string;
+  date: string;
+};
+
 export function formatWeight(kg: number): string {
   const f2 = kg.toFixed(2);
   return f2.endsWith("0") ? kg.toFixed(1) : f2;
 }
 
-export function exerciseHrefs(exerciseId: number, fromDate: string) {
-  const from = fromDate ? `?from=${fromDate}` : "";
+export function exerciseHrefs(
+  exerciseId: number,
+  workoutExerciseId: number,
+  fromDate: string,
+) {
+  const from = workoutExerciseId ? `?from=${workoutExerciseId}` : "";
   return {
     feedHref: fromDate ? `/?date=${fromDate}` : "/",
-    setsHref: fromDate
-      ? `/exercise/${exerciseId}/${fromDate}`
-      : `/exercise/${exerciseId}/${todayStr()}`,
+    setsHref: `/exercise/${exerciseId}/${workoutExerciseId}`,
     historyHref: `/exercise/${exerciseId}/history${from}`,
     graphHref: `/exercise/${exerciseId}/graph${from}`,
     prsHref: `/exercise/${exerciseId}/prs${from}`,
