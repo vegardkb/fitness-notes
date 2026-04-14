@@ -7,14 +7,18 @@
     import { onMount } from "svelte";
     import { onNavigate } from "$app/navigation";
     import Toaster from "$lib/Toaster.svelte";
+    import { invoke } from "@tauri-apps/api/core";
 
     let { children } = $props();
+    type Settings = {
+        dark_mode: boolean;
+        height: number;
+        sex: string;
+        weight: number;
+    };
 
     onMount(async () => {
-        //const settings = await invoke<{ dark_mode: boolean }>(
-        //    "get_settings_frontend",
-        //);
-        const settings = { dark_mode: false };
+        const settings = await invoke<Settings>("get_settings");
         document.documentElement.dataset.theme = settings.dark_mode
             ? "dark"
             : "light";

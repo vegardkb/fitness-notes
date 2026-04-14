@@ -64,6 +64,7 @@ pub struct WorkoutExerciseContext {
     pub date: String,
 }
 
+#[derive(Serialize)]
 pub struct Settings {
     pub height: i64,
     pub unit: WeightUnit,
@@ -99,6 +100,7 @@ pub struct DerivedMetricIds {
     pub ffmi: i64,
 }
 
+#[derive(Serialize)]
 pub enum Sex {
     Male,
     Female,
@@ -114,6 +116,7 @@ impl From<String> for Sex {
     }
 }
 
+#[derive(Serialize)]
 pub enum WeightUnit {
     Kg,
     Lbs,

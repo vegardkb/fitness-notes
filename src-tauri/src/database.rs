@@ -1,5 +1,3 @@
-use crate::models::{Settings, Sex, WeightUnit};
-
 const SCHEMA_VERSION: u32 = 4;
 
 pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), String> {
@@ -370,33 +368,4 @@ pub fn recompute_pr_flags(conn: &rusqlite::Connection, exercise_id: i64) -> Resu
     .map_err(|e| e.to_string())?;
 
     Ok(())
-}
-
-pub fn get_settings(conn: &rusqlite::Connection) -> Result<Settings, String> {
-    let mut stmt = conn
-        .prepare("SELECT us.height_cm, us.sex, us.dark_mode, us.unit FROM user_settings us")
-        .map_err(|e| e.to_string())?;
-
-    let mut row = stmt
-        .query_map([], |row| {
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, bool>(2)?,
-                row.get::<_, String>(3)?,
-            ))
-        })
-        .map_err(|e| e.to_string())?;
-
-    let r = row.next();
-    match r {
-        Some(Ok((height, sex, dark_mode, unit))) => Ok(Settings {
-            height,
-            sex: Sex::from(sex),
-            dark_mode,
-            unit: WeightUnit::from(unit),
-        }),
-        Some(Err(e)) => Err(e.to_string()),
-        None => Err("No settings found".to_string()),
-    }
 }

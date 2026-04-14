@@ -13,6 +13,7 @@ use crate::commands::import::{
     parse_fitnotes_csv,
 };
 use crate::commands::sets::{delete_set, reorder_exercises, reorder_sets, upsert_set};
+use crate::commands::settings::{delete_all_data, get_settings};
 use crate::commands::workouts::{
     add_exercise_to_workout, get_active_dates, get_sets_for_workout_exercise,
     get_workout_exercise_context, get_workout_for_date, get_workouts_for_range,
@@ -31,7 +32,6 @@ mod tests;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_haptics::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             initialize_db(app)?;
@@ -70,6 +70,7 @@ pub fn run() {
             parse_body_measurements_csv,
             import_body_measurement_rows,
             delete_all_data,
+            get_settings,
             upsert_body_measurement,
             delete_body_measurement,
             get_measurements_for_date,
@@ -79,22 +80,6 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
-}
-
-pub fn delete_all_data_inner(conn: &rusqlite::Connection) -> Result<(), String> {
-    conn.execute_batch(
-        "DELETE FROM sets;
-         DELETE FROM workout_exercises;
-         DELETE FROM workouts;
-         DELETE FROM body_measurements;",
-    )
-    .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn delete_all_data(db: tauri::State<std::sync::Mutex<rusqlite::Connection>>) -> Result<(), String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
-    delete_all_data_inner(&conn)
 }
 
 fn initialize_db(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {

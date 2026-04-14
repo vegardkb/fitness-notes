@@ -1,6 +1,6 @@
-use crate::models::{DayMeasurement, DerivedMetricIds, Measurement, Metric, Sex};
+use crate::models::{DayMeasurement, DerivedMetricIds, Measurement, Metric, Settings, Sex};
 
-use crate::{database::get_settings, models::Settings};
+use crate::commands::settings::get_settings_inner;
 
 pub fn upsert_body_measurement_inner(
     conn: &rusqlite::Connection,
@@ -113,7 +113,7 @@ pub fn get_last_measurements_for_date_inner(
         });
     }
 
-    let settings = get_settings(conn)?;
+    let settings = get_settings_inner(conn)?;
     let derived_metrics = get_derived_metric_ids(conn)?;
     let derived_result = calculate_derived_metrics(&settings, &result, &derived_metrics);
     for m in derived_result {
@@ -187,7 +187,7 @@ pub fn get_measurement_history_inner(
     }
 
     let derived_metrics = get_derived_metric_ids(conn)?;
-    let settings = get_settings(conn)?;
+    let settings = get_settings_inner(conn)?;
     for day in &mut result {
         let derived_result =
             calculate_derived_metrics(&settings, &day.measurements, &derived_metrics);
@@ -248,7 +248,7 @@ pub fn get_measurements_for_date_inner(
             id: Some(id),
         });
     }
-    let settings = get_settings(conn)?;
+    let settings = get_settings_inner(conn)?;
     let derived_metrics = get_derived_metric_ids(conn)?;
     let derived_result = calculate_derived_metrics(&settings, &result, &derived_metrics);
     for m in derived_result {

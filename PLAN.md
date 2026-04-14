@@ -107,8 +107,6 @@ The `/settings` page currently only has import and delete-all. Expose the user p
 **Frontend** — new "Profile" section in `src/routes/settings/+page.svelte`:
 - Height (number input)
 - Sex (male/female)
-- Weight unit (kg/lbs)
-- Estimate body fat (toggle)
 - Dark mode (toggle) — immediately applies `document.documentElement.dataset.theme`
 - Season start + use seasons toggle (once feature 5 lands)
 

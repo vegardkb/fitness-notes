@@ -61,6 +61,7 @@
         longPressJustFired = false;
         touchStartX = e.clientX;
         touchStartY = e.clientY;
+        if (!dragDisabled) return;
         startHold(we_id);
     }
 
