@@ -6,7 +6,7 @@
 - **Calendar** (`/calendar`): Month view with activity dots, navigates to feed date
 - **Exercise tracker** (`/exercise/[id]/[date]`): Full CRUD for sets, PR tracking, history, graph (estimated 1RM), PRs table (nRM viewer)
 - **Body tracker** (`/body/[date]`): Log measurements per metric; derived metrics (BMI, Body Fat (Navy), FFMI (Navy)) computed on the fly from stored inputs, never written to DB; history view. `is_derived` flag in `body_metrics` controls read-only rendering. Derived metric dates reflect the most recently updated input.
-- **Settings** (`/settings`): FitNotes exercise CSV import wizard, FitNotes Body Tracker CSV import wizard (resolve unknowns: create/map/skip), delete all data
+- **Settings** (`/settings`): FitNotes exercise CSV import wizard, FitNotes Body Tracker CSV import wizard (resolve unknowns: create/map/skip), delete all data. Preferences/user profile: Sex, height and light/dark mode toggle
 - **Light/dark mode**: CSS variables defined; `dark_mode` stored in DB but not yet wired to the UI
 - **Exercise/category management** (`/exercises/[date]`): Category → exercise drill-down, full CRUD (create, rename, delete, merge) for both categories and exercises via inline inputs and ⋯ context menus. Merge moves all sets/history to the target and recomputes PRs. Errors surface as toasts.
 - **Workout/exercise model refactor**: Migration v4 — `workout_order` added to `workouts`, unique constraints removed from `workouts.date` and `workout_exercises(workout_id, exercise_id)`, `sets` now references `workout_exercise_id` FK with `exercise_id` kept denormalized. Route is `/exercise/[id]/[we_id]` (deviation from plan: `exercise_id` kept in URL so history/graph/prs sub-routes can resolve it via the shared `[id]` layout without an extra lookup). Long-press select mode in DayCard allows merge and delete of `workout_exercise` instances. `reorder_exercises` recomputes PR flags after reorder.
@@ -93,24 +93,6 @@ v6: ALTER TABLE user_settings ADD COLUMN use_seasons BOOLEAN DEFAULT true
 v7: ALTER TABLE sets ADD COLUMN is_season_pr BOOLEAN DEFAULT false
 v8: CREATE TABLE templates / template_exercises / planned_sets
 ```
-
----
-
-### 5. Settings menu
-
-The `/settings` page currently only has import and delete-all. Expose the user profile stored in `user_settings`.
-
-**Commands**:
-- `get_settings_frontend() → SettingsResponse` — needs a new serializable struct (current `Settings` struct is not `Serialize`)
-- `update_settings(height_cm, unit, dark_mode, estimate_body_fat, sex, season_start, use_seasons)`
-
-**Frontend** — new "Profile" section in `src/routes/settings/+page.svelte`:
-- Height (number input)
-- Sex (male/female)
-- Dark mode (toggle) — immediately applies `document.documentElement.dataset.theme`
-- Season start + use seasons toggle (once feature 5 lands)
-
-Load on mount; save on change (debounced or on blur). Apply dark mode in `src/routes/+layout.svelte` on boot.
 
 ---
 
@@ -294,7 +276,7 @@ New Rust commands:
 6. ~~**Body measurements import**~~ ✓ done
 7. ~~**Android build/test workflow**~~ ✓ done — `tauri android dev` for iteration, `deploy.sh` for release
 8. ~~**Workout/exercise model refactor**~~ ✓ done — workout_exercise_id, exercise repetition, merge/delete via select mode, backend tests
-9. **Settings menu** — user profile, dark mode, manual export/restore
+9. ~~**Settings menu**~~ ✓ done — user profile, dark mode, manual export/restore
 10. **Complete body tracker** (graph + PRs)
 11. **Workout templates** — depends on refactor (section 8)
 12. **Season PRs** — depends on settings

@@ -16,6 +16,7 @@
   "dependencies": {
     "@fontsource/dm-sans": "^5.2.8",
     "@fontsource/source-serif-4": "^5.2.9",
+    "@radix-ui/colors": "^3.0.0",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-haptics": "~2",
     "@tauri-apps/plugin-opener": "^2",

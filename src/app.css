@@ -1,15 +1,23 @@
+@import "@radix-ui/colors/olive.css";
+@import "@radix-ui/colors/olive-dark.css";
+@import "@radix-ui/colors/grass.css";
+@import "@radix-ui/colors/grass-dark.css";
+@import "@radix-ui/colors/tomato.css";
+@import "@radix-ui/colors/tomato-dark.css";
+
 :root {
-    --bg: #0f0f0f;
-    --surface: #1a1a1a;
-    --surface-hover: #222;
-    --border: #2a2a2a;
-    --text: #e8e8e8;
-    --text-muted: #888;
-    --accent: #4ade80;
-    --accent-dim: #22543d;
-    --danger: #f87171;
+    --bg: var(--olive-1);
+    --surface: var(--olive-2);
+    --surface-hover: var(--olive-3);
+    --clickable: var(--olive-4);
+    --border: var(--olive-6);
+    --text: var(--olive-12);
+    --text-muted: var(--olive-10);
+    --accent: var(--grass-9);
+    --accent-dim: var(--grass-3);
+    --danger: var(--tomato-9);
     --radius: 2px;
-    --spacing: 1rem;
+    --spacing: 0.5rem;
     --app-header-height: 2.75rem;
     --dur-fast: 80ms;
     --dur-med: 150ms;
@@ -33,16 +41,6 @@
     --text-lg: 1.1rem;
     --text-xl: 1.25rem;
     font-family: "DM Sans", sans-serif;
-}
-[data-theme="light"] {
-    --bg: #faf8f5;
-    --surface: #f5f2ee;
-    --surface-hover: #ece9e4;
-    --border: #d6d0c8;
-    --text: #1c1917;
-    --text-muted: #78716c;
-    --accent: #5c7a5f;
-    --accent-dim: #d4e6d6;
 }
 
 * {
@@ -332,6 +330,10 @@ h1,
     width: 100%;
 }
 
+.settings-row .field .stat-val {
+    max-width: 8ch;
+}
+
 .field input:focus {
     outline: none;
     border-color: var(--accent);
@@ -351,7 +353,7 @@ h1,
 }
 
 .pr-badge--historic {
-    background: var(--border);
+    background: var(--clickable);
     color: var(--text-muted);
 }
 
@@ -372,7 +374,7 @@ h1,
     justify-content: space-between;
     padding: 0.75rem var(--spacing);
     width: 100%;
-    background: none;
+    background: var(--surface-hover);
     border: none;
     color: var(--text);
     font-size: var(--text-base);
@@ -384,7 +386,7 @@ h1,
 }
 
 .exercise-card-header:active {
-    background: var(--surface-hover);
+    background: var(--surface);
 }
 
 .exercise-card-sets {
@@ -760,11 +762,11 @@ h1,
 
 .feed {
     max-width: var(--max-width);
-    margin: 0 auto;
+    margin: 0 var(--spacing);
     padding: 0 var(--spacing) calc(3rem + env(safe-area-inset-bottom, 0px));
     display: flex;
     flex-direction: column;
-    gap: 2rem;
+    gap: 1rem;
 }
 
 .feed-sentinel {
@@ -938,6 +940,7 @@ tr.ghost td {
     font-size: var(--text-sm);
     color: var(--text-muted);
     min-width: 2ch;
+    padding-left: 0.25rem;
 }
 .save-btn {
     background: none;

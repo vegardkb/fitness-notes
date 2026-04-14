@@ -1,7 +1,10 @@
 <script lang="ts">
     import type { Category } from "$lib/exercise";
     import { invoke } from "@tauri-apps/api/core";
-    import { ArrowLeft, ChevronRight } from "lucide-svelte";
+    import { onMount } from "svelte";
+
+    import { ArrowLeft, ChevronRight, Circle } from "lucide-svelte";
+    import type { Settings } from "$lib/settings";
 
     type ExerciseRow = {
         date: string;
@@ -39,7 +42,12 @@
         days_touched: number;
     };
     type Exercise = { id: number; name: string };
-    type Metric = { id: number; name: string; unit: string; is_derived: boolean };
+    type Metric = {
+        id: number;
+        name: string;
+        unit: string;
+        is_derived: boolean;
+    };
 
     type Phase =
         | { name: "idle" }
@@ -276,7 +284,10 @@
 
     function continueBodyToConfirm() {
         if (phase.name !== "body_resolving") return;
-        const resolvedRows = buildResolvedBodyRows(phase.rows, phase.resolutions);
+        const resolvedRows = buildResolvedBodyRows(
+            phase.rows,
+            phase.resolutions,
+        );
         const dateCount = new Set(resolvedRows.map((r) => r.date)).size;
         phase = {
             name: "body_confirming",
@@ -341,6 +352,36 @@
             pickingFor = null;
         }
     }
+
+    let settings: Settings = $state({
+        dark_mode: false,
+        height: 0,
+        sex: "",
+        weight: 0,
+    });
+    let theme = $derived(settings.dark_mode ? "Dark" : "Light");
+    async function refreshSettings() {
+        settings = await invoke("get_settings");
+        document.documentElement.classList.toggle("dark", settings.dark_mode);
+    }
+    onMount(async () => {
+        await refreshSettings();
+    });
+
+    async function setTheme(theme: string) {
+        await invoke("set_dark_mode", { darkMode: theme === "Dark" });
+        await refreshSettings();
+    }
+
+    async function setSex(sex: string) {
+        await invoke("set_sex", { sex });
+        await refreshSettings();
+    }
+
+    async function setHeight(height: number) {
+        await invoke("set_height", { height });
+        await refreshSettings();
+    }
 </script>
 
 <div class="page">
@@ -352,6 +393,50 @@
     </div>
 
     {#if phase.name === "idle"}
+        <div class="settings-section">
+            <h2 class="settings-section-title">Preferences</h2>
+            <div class="settings-row">
+                <span>Theme</span>
+                <div class="graph-ranges">
+                    {#each ["Light", "Dark"] as const as s}
+                        <button
+                            class="range-pill"
+                            class:range-pill--active={theme === s}
+                            onclick={() => setTheme(s)}
+                        >
+                            {s}
+                        </button>
+                    {/each}
+                </div>
+            </div>
+            <div class="settings-row">
+                <span>Sex</span>
+                <div class="graph-ranges">
+                    {#each ["Female", "Male"] as const as s}
+                        <button
+                            class="range-pill"
+                            class:range-pill--active={settings.sex === s}
+                            onclick={() => setSex(s)}
+                        >
+                            {s}
+                        </button>
+                    {/each}
+                </div>
+            </div>
+            <div class="settings-row">
+                <span>Height</span>
+                <span class="body-value">
+                    <input
+                        type="number"
+                        step="1"
+                        bind:value={settings.height}
+                        onchange={() => setHeight(settings.height)}
+                        onblur={() => setHeight(settings.height)}
+                    />
+                    <span class="body-unit">cm</span>
+                </span>
+            </div>
+        </div>
         <div class="settings-section">
             <h2 class="settings-section-title">Import</h2>
             <div class="settings-row">
@@ -591,8 +676,7 @@
                             Skip
                         </button>
                         {#if res.action === "map"}
-                            <span class="import-mapped-label"
-                                >→ {res.name}</span
+                            <span class="import-mapped-label">→ {res.name}</span
                             >
                         {/if}
                     </div>

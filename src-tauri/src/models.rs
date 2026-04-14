@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 pub struct Exercise {
@@ -100,7 +100,7 @@ pub struct DerivedMetricIds {
     pub ffmi: i64,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub enum Sex {
     Male,
     Female,

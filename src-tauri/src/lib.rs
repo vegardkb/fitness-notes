@@ -13,7 +13,9 @@ use crate::commands::import::{
     parse_fitnotes_csv,
 };
 use crate::commands::sets::{delete_set, reorder_exercises, reorder_sets, upsert_set};
-use crate::commands::settings::{delete_all_data, get_settings};
+use crate::commands::settings::{
+    delete_all_data, get_settings, set_dark_mode, set_height, set_sex,
+};
 use crate::commands::workouts::{
     add_exercise_to_workout, get_active_dates, get_sets_for_workout_exercise,
     get_workout_exercise_context, get_workout_for_date, get_workouts_for_range,
@@ -71,6 +73,9 @@ pub fn run() {
             import_body_measurement_rows,
             delete_all_data,
             get_settings,
+            set_dark_mode,
+            set_sex,
+            set_height,
             upsert_body_measurement,
             delete_body_measurement,
             get_measurements_for_date,

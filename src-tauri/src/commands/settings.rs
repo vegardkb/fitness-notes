@@ -54,3 +54,58 @@ pub fn get_settings(
     let conn = db.lock().map_err(|e| e.to_string())?;
     get_settings_inner(&conn)
 }
+
+pub fn set_dark_mode_inner(conn: &rusqlite::Connection, dark_mode: bool) -> Result<(), String> {
+    let mut stmt = conn
+        .prepare("UPDATE user_settings SET dark_mode = ?")
+        .map_err(|e| e.to_string())?;
+    stmt.execute([dark_mode]).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_dark_mode(
+    dark_mode: bool,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    set_dark_mode_inner(&conn, dark_mode)
+}
+
+pub fn set_sex_inner(conn: &rusqlite::Connection, sex: Sex) -> Result<(), String> {
+    let sex_string = match sex {
+        Sex::Male => "male",
+        Sex::Female => "female",
+    };
+    let mut stmt = conn
+        .prepare("UPDATE user_settings SET sex = ?")
+        .map_err(|e| e.to_string())?;
+    stmt.execute([sex_string]).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_sex(
+    sex: Sex,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    set_sex_inner(&conn, sex)
+}
+
+pub fn set_height_inner(conn: &rusqlite::Connection, height: f64) -> Result<(), String> {
+    let mut stmt = conn
+        .prepare("UPDATE user_settings SET height_cm = ?")
+        .map_err(|e| e.to_string())?;
+    stmt.execute([height]).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_height(
+    height: f64,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    set_height_inner(&conn, height)
+}
