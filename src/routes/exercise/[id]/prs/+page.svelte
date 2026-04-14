@@ -47,7 +47,13 @@
                         <td class="td-rm">RM</td>
                         <td class="td-weight">
                             <a href={`/exercise/${exerciseId}/${item.date}`}>
-                                <span>{formatWeight(item.weight_kg)} kg</span>
+                                <span class="stat-val stat-val--weight"
+                                    >{formatWeight(item.weight_kg)}<span
+                                        class="stat-unit"
+                                    >
+                                        kg</span
+                                    ></span
+                                >
                                 <span class="date"
                                     >{new Intl.DateTimeFormat("no", {
                                         dateStyle: "short",
