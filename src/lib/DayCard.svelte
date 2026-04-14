@@ -172,26 +172,24 @@
             onfinalize={handleFinalize}
         >
             {#each exercises as ex (ex.id)}
-                <div
+                <button
                     class="exercise-card"
                     class:selected={selectedExercises.includes(
                         ex.workout_exercise_id,
                     )}
+                    onpointerdown={(e) =>
+                        handlePointerDown(e, ex.workout_exercise_id)}
+                    onpointermove={handlePointerMove}
+                    onpointerup={stopHold}
+                    onpointercancel={stopHold}
+                    onclick={() =>
+                        selectMode
+                            ? selectExercise(ex.workout_exercise_id)
+                            : goto(
+                                  `/exercise/${ex.exercise_id}/${ex.workout_exercise_id}`,
+                              )}
                 >
-                    <button
-                        class="exercise-card-header"
-                        onpointerdown={(e) =>
-                            handlePointerDown(e, ex.workout_exercise_id)}
-                        onpointermove={handlePointerMove}
-                        onpointerup={stopHold}
-                        onpointercancel={stopHold}
-                        onclick={() =>
-                            selectMode
-                                ? selectExercise(ex.workout_exercise_id)
-                                : goto(
-                                      `/exercise/${ex.exercise_id}/${ex.workout_exercise_id}`,
-                                  )}
-                    >
+                    <div class="exercise-card-header">
                         <span
                             class="drag-handle"
                             role="button"
@@ -204,7 +202,7 @@
                         <span class="muted"
                             ><ChevronRight size={16} strokeWidth={1.5} /></span
                         >
-                    </button>
+                    </div>
                     <div class="exercise-card-sets">
                         {#each ex.sets as set, i}
                             <div class="set-row">
@@ -232,7 +230,7 @@
                             </div>
                         {/each}
                     </div>
-                </div>
+                </button>
             {/each}
         </div>
         {#if selectMode}

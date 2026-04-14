@@ -359,9 +359,20 @@ h1,
 
 .exercise-card {
     background: var(--surface);
+    transition:
+        transform var(--dur-med) var(--easing),
+        background var(--dur-med) var(--easing);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     overflow: hidden;
+}
+
+.exercise-card:active {
+    transform: scale(0.95);
+}
+
+.exercise-card:active .exercise-card-header {
+    background: var(--surface);
 }
 
 .exercise-card.selected {
@@ -383,10 +394,6 @@ h1,
     transition: background var(--dur-fast) var(--easing);
     user-select: none;
     -webkit-user-select: none;
-}
-
-.exercise-card-header:active {
-    background: var(--surface);
 }
 
 .exercise-card-sets {
