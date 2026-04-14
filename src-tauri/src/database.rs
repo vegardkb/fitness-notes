@@ -1,4 +1,4 @@
-const SCHEMA_VERSION: u32 = 4;
+const SCHEMA_VERSION: u32 = 7;
 
 pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), String> {
     let current = conn
@@ -30,6 +30,24 @@ pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), String> {
     if current < 4 && 4 <= SCHEMA_VERSION {
         migrate_4(conn).map_err(|e| e.to_string())?;
         conn.execute_batch("PRAGMA user_version = 4")
+            .map_err(|e| e.to_string())?;
+    }
+
+    if current < 5 && 5 <= SCHEMA_VERSION {
+        migrate_5(conn).map_err(|e| e.to_string())?;
+        conn.execute_batch("PRAGMA user_version = 5")
+            .map_err(|e| e.to_string())?;
+    }
+
+    if current < 6 && 6 <= SCHEMA_VERSION {
+        migrate_6(conn).map_err(|e| e.to_string())?;
+        conn.execute_batch("PRAGMA user_version = 6")
+            .map_err(|e| e.to_string())?;
+    }
+
+    if current < 7 && 7 <= SCHEMA_VERSION {
+        migrate_7(conn).map_err(|e| e.to_string())?;
+        conn.execute_batch("PRAGMA user_version = 7")
             .map_err(|e| e.to_string())?;
     }
 
@@ -302,6 +320,88 @@ fn migrate_4(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::error::Erro
         COMMIT;",
     )?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+    Ok(())
+}
+
+fn migrate_5(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::error::Error>> {
+    conn.execute_batch("PRAGMA foreign_keys = OFF;")?;
+    conn.execute_batch(
+        "
+            BEGIN;
+            CREATE TABLE templates (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE
+            );
+            CREATE TABLE template_exercises (
+                id              INTEGER PRIMARY KEY,
+                template_id     INTEGER NOT NULL REFERENCES templates(id),
+                exercise_id     INTEGER NOT NULL REFERENCES templates(id),
+                exercise_order  INTEGER NOT NULL
+            );
+            CREATE TABLE template_sets (
+                id                      INTEGER PRIMARY KEY,
+                template_id             INTEGER NOT NULL REFERENCES templates(id),
+                template_exercise_id    INTEGER NOT NULL REFERENCES template_exercises (id),
+                set_order               INTEGER NOT NULL,
+                weight_kg               REAL NOT NULL,
+                reps                    INTEGER NOT NULL
+            );
+            COMMIT;",
+    )?;
+    conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+
+    Ok(())
+}
+
+fn migrate_6(conn: &rusqlite::Connection) -> Result<(), String> {
+    conn.execute_batch("PRAGMA foreign_keys = OFF;")
+        .map_err(|e| e.to_string())?;
+    conn.execute_batch(
+        "
+            BEGIN;
+            DROP TABLE templates;
+            DROP TABLE template_exercises;
+            DROP TABLE template_sets;
+            CREATE TABLE templates (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE
+            );
+            CREATE TABLE template_exercises (
+                id              INTEGER PRIMARY KEY,
+                template_id     INTEGER NOT NULL REFERENCES templates(id),
+                exercise_id     INTEGER NOT NULL REFERENCES exercises(id),
+                exercise_order  INTEGER NOT NULL
+            );
+            CREATE TABLE template_sets (
+                id                      INTEGER PRIMARY KEY,
+                template_id             INTEGER NOT NULL REFERENCES templates(id),
+                template_exercise_id    INTEGER NOT NULL REFERENCES template_exercises (id),
+                set_order               INTEGER NOT NULL,
+                weight_kg               REAL NOT NULL,
+                reps                    INTEGER NOT NULL
+            );
+            COMMIT;",
+    )
+    .map_err(|e| e.to_string())?;
+    conn.execute_batch("PRAGMA foreign_keys = ON;")
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+fn migrate_7(conn: &rusqlite::Connection) -> Result<(), String> {
+    conn.execute_batch("PRAGMA foreign_keys = OFF;")
+        .map_err(|e| e.to_string())?;
+    conn.execute_batch(
+        "
+            BEGIN;
+            ALTER TABLE workouts ADD COLUMN name TEXT;
+            COMMIT;",
+    )
+    .map_err(|e| e.to_string())?;
+    conn.execute_batch("PRAGMA foreign_keys = ON;")
+        .map_err(|e| e.to_string())?;
+
     Ok(())
 }
 

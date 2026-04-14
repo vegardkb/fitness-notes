@@ -29,6 +29,11 @@ export type ExerciseWithSets = {
   sets: Set[];
 };
 
+export type Template = {
+  id: number;
+  name: string;
+};
+
 export type Category = {
   id: number;
   name: string;

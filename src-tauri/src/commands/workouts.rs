@@ -117,6 +117,50 @@ pub fn get_sets_for_workout_exercise_inner(
 }
 
 #[tauri::command]
+pub fn get_workout_id_for_date(
+    date: &str,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<Option<i64>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    get_workout_id_for_date_inner(&conn, date)
+}
+
+pub fn get_workout_id_for_date_inner(
+    conn: &rusqlite::Connection,
+    date: &str,
+) -> Result<Option<i64>, String> {
+    let row = conn
+        .query_row("SELECT id FROM workouts WHERE date = ?1", [date], |row| {
+            Ok(row.get::<_, i64>(0)?)
+        })
+        .optional()
+        .map_err(|e| e.to_string())?;
+    Ok(row)
+}
+
+#[tauri::command]
+pub fn get_workout_name_for_date(
+    date: &str,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<Option<String>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    get_workout_name_for_date_inner(&conn, date)
+}
+
+pub fn get_workout_name_for_date_inner(
+    conn: &rusqlite::Connection,
+    date: &str,
+) -> Result<Option<String>, String> {
+    let row = conn
+        .query_row("SELECT name FROM workouts WHERE date = ?1", [date], |row| {
+            Ok(row.get::<_, String>(0)?)
+        })
+        .optional()
+        .map_err(|e| e.to_string())?;
+    Ok(row)
+}
+
+#[tauri::command]
 pub fn get_workout_for_date(
     date: &str,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,

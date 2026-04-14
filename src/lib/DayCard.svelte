@@ -2,6 +2,7 @@
     import { goto } from "$app/navigation";
     import { invoke } from "@tauri-apps/api/core";
     import { selectionFeedback } from "@tauri-apps/plugin-haptics";
+    import { toast } from "$lib/toast";
 
     import { onMount } from "svelte";
     import { dndzone } from "svelte-dnd-action";
@@ -14,12 +15,15 @@
         X,
         Trash,
         Merge,
+        ClipboardPaste,
+        ClipboardCopy,
     } from "lucide-svelte";
     import type { ExerciseWithSets } from "$lib/exercise";
     import { formatWeight } from "$lib/exercise";
 
     let { date }: { date: string } = $props();
 
+    let workoutTitle = $state("Workout");
     let exercises = $state<ExerciseWithSets[]>([]);
 
     let dragDisabled = $state(true);
@@ -30,6 +34,16 @@
             { date },
         );
         exercises = result.map((e) => ({ ...e, id: e.workout_exercise_id }));
+        const name = await invoke<string | null>("get_workout_name_for_date", {
+            date,
+        });
+        if (name) {
+            workoutTitle = name;
+        } else if (result.length === 0) {
+            workoutTitle = "Rest";
+        } else {
+            workoutTitle = "Workout";
+        }
     }
 
     onMount(loadExercises);
@@ -143,6 +157,27 @@
         selectMode = false;
         loadExercises();
     }
+
+    async function saveTemplate() {
+        try {
+            let workoutId = await invoke<number | null>(
+                "get_workout_id_for_date",
+                {
+                    date,
+                },
+            );
+            await invoke("save_workout_as_template", {
+                workoutId,
+                name: workoutTitle,
+            });
+        } catch (e) {
+            toast.show(String(e), "error");
+        }
+        isCreatingTemplate = false;
+        loadExercises();
+    }
+
+    let isCreatingTemplate = $state(false);
 </script>
 
 <article class="day-card" id="day-{date}">
@@ -152,15 +187,38 @@
             <button class="back-btn" onclick={() => goto(`/body/${date}`)}>
                 <PersonStanding size={18} strokeWidth={2} />
             </button>
-            <button class="back-btn" onclick={() => goto(`/exercises/${date}`)}>
-                <Dumbbell size={18} strokeWidth={1.5} />
-            </button>
         </div>
     </div>
 
-    {#if exercises.length === 0}
-        <p class="empty">Rest day</p>
-    {:else}
+    <div class="workout-card">
+        <div class="workout-card-header">
+            <h2 class="workout-title">{workoutTitle}</h2>
+            <div class="workout-card-btns">
+                {#if exercises.length === 0}
+                    <button
+                        class="back-btn"
+                        onclick={() => goto(`/templates/${date}`)}
+                    >
+                        <ClipboardPaste size={18} strokeWidth={1.5} />
+                    </button>
+                {:else}
+                    <button
+                        class="back-btn"
+                        onclick={() => {
+                            isCreatingTemplate = true;
+                        }}
+                    >
+                        <ClipboardCopy size={18} strokeWidth={1.5} />
+                    </button>
+                {/if}
+                <button
+                    class="back-btn"
+                    onclick={() => goto(`/exercises/${date}`)}
+                >
+                    <Dumbbell size={18} strokeWidth={1.5} />
+                </button>
+            </div>
+        </div>
         <div
             class="list"
             use:dndzone={{
@@ -233,26 +291,43 @@
                 </button>
             {/each}
         </div>
-        {#if selectMode}
-            <div class="selection-bar">
-                <button class="icon-btn" onclick={() => cancelSelection()}>
-                    <X size={16} strokeWidth={1.5} />
-                </button>
-                <span>{selectedExercises.length} selected</span>
+    </div>
+    {#if selectMode}
+        <div class="selection-bar">
+            <button class="icon-btn" onclick={() => cancelSelection()}>
+                <X size={16} strokeWidth={1.5} />
+            </button>
+            <span>{selectedExercises.length} selected</span>
+            <button class="icon-btn" onclick={() => deleteSelectedExercises()}>
+                <Trash size={16} strokeWidth={1.5} />
+            </button>
+            <button
+                class="icon-btn"
+                onclick={() => mergeSelectedExercises()}
+                disabled={selectedExercises.length < 2}
+            >
+                <Merge size={16} strokeWidth={1.5} />
+            </button>
+        </div>
+    {/if}
+    {#if isCreatingTemplate}
+        <div class="template-bar">
+            <input
+                type="text"
+                class="template-name-input"
+                bind:value={workoutTitle}
+            />
+            <span>
                 <button
-                    class="icon-btn"
-                    onclick={() => deleteSelectedExercises()}
+                    class="delete-btn"
+                    onclick={() => (isCreatingTemplate = false)}
                 >
-                    <Trash size={16} strokeWidth={1.5} />
+                    Cancel
                 </button>
-                <button
-                    class="icon-btn"
-                    onclick={() => mergeSelectedExercises()}
-                    disabled={selectedExercises.length < 2}
-                >
-                    <Merge size={16} strokeWidth={1.5} />
+                <button class="add-btn" onclick={() => saveTemplate()}>
+                    Save
                 </button>
-            </div>
-        {/if}
+            </span>
+        </div>
     {/if}
 </article>

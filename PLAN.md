@@ -88,10 +88,11 @@ user_settings (
 
 Pending migrations to add as features land:
 ```
-v5: ALTER TABLE user_settings ADD COLUMN season_start TEXT DEFAULT '01-01'
-v6: ALTER TABLE user_settings ADD COLUMN use_seasons BOOLEAN DEFAULT true
-v7: ALTER TABLE sets ADD COLUMN is_season_pr BOOLEAN DEFAULT false
-v8: CREATE TABLE templates / template_exercises / planned_sets
+v5–v6: CREATE TABLE templates / template_exercises / template_sets  ← implemented
+v7: ALTER TABLE workouts ADD COLUMN name TEXT
+v8: ALTER TABLE user_settings ADD COLUMN season_start TEXT DEFAULT '01-01'
+v9: ALTER TABLE user_settings ADD COLUMN use_seasons BOOLEAN DEFAULT true
+v10: ALTER TABLE sets ADD COLUMN is_season_pr BOOLEAN DEFAULT false
 ```
 
 ---
@@ -120,62 +121,41 @@ Graph and PRs tabs exist in `BodyHeader.svelte` but have no routes yet.
 
 Save a named list of exercises as a reusable template; apply it to any date to pre-populate the day's workout.
 
-**DB changes** (migration v8):
+**DB changes** (migrations v5–v6, implemented):
 ```sql
-CREATE TABLE templates (
-    id   INTEGER PRIMARY KEY,
-    name TEXT NOT NULL UNIQUE
-);
-CREATE TABLE template_exercises (
-    id             INTEGER PRIMARY KEY,
-    template_id    INTEGER NOT NULL REFERENCES templates(id),
-    exercise_id    INTEGER NOT NULL REFERENCES exercises(id),
-    exercise_order INTEGER NOT NULL,
-    UNIQUE(template_id, exercise_id)
-);
+CREATE TABLE templates (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE);
+CREATE TABLE template_exercises (id INTEGER PRIMARY KEY, template_id INTEGER NOT NULL REFERENCES templates(id), exercise_id INTEGER NOT NULL REFERENCES exercises(id), exercise_order INTEGER NOT NULL);
+CREATE TABLE template_sets (id INTEGER PRIMARY KEY, template_id INTEGER NOT NULL REFERENCES templates(id), template_exercise_id INTEGER NOT NULL REFERENCES template_exercises(id), set_order INTEGER NOT NULL, weight_kg REAL NOT NULL, reps INTEGER NOT NULL);
+```
+
+**Commands** (implemented in `src-tauri/src/commands/templates.rs`):
+- `rename_template(id, name)`
+- `save_workout_as_template(workout_id, name)` — snapshots workout_exercises + sets into template tables, wrapped in a transaction
+- `list_templates() → Vec<Template>`
+- `delete_template(template_id)`
+- `apply_template(template_id, date)` — creates workout + workout_exercises + sets from template, then calls `recompute_pr_flags` for each exercise; wrapped in a transaction
+
+**Frontend** (implemented):
+- `src/routes/templates/[date]/+page.svelte` — list and select templates; navigates back to `/?date=`
+- `src/lib/DayCard.svelte` — ClipboardPaste (apply template) when rest day, ClipboardCopy (save as template) when workout exists; template-bar input for naming
+
+#### Workout name (migration v7, not yet implemented)
+
+Workouts get an optional `name` column. The title shown in `DayCard` reflects the workout name; applying a template names the new workout after the template.
+
+**DB change** (migration v7):
+```sql
+ALTER TABLE workouts ADD COLUMN name TEXT;
 ```
 
 **Commands**:
-- `create_template(name) → i64`
-- `save_day_as_template(date, name) → i64` — snapshot current workout_exercises for a date
-- `list_templates() → Vec<{id, name, exercises[]}>`
-- `delete_template(id)`
-- `apply_template(template_id, date)` — creates `workout_exercises` rows for each template exercise and populates `planned_sets` (see below) using last logged weight/reps as targets (fallback: `weight=null, reps=null`)
+- New `get_workout_name_for_date(date) → Option<String>` in `workouts.rs` — `SELECT name FROM workouts WHERE date = ?1`
+- Update `apply_template_inner` in `templates.rs` — query `SELECT name FROM templates WHERE id = ?1` before inserting the workout, then use it: `INSERT INTO workouts (date, workout_order, name) VALUES (?1, 1, ?2)`
 
-**Frontend**:
-- New route `src/routes/templates/` — list, delete, create from current day
-- New `src/lib/TemplateModal.svelte` — picker modal, similar to `AddExerciseModal`
-- `src/lib/DayCard.svelte` — "Use template" button alongside "Add exercise"
-- Exercise page: show planned and actual sets side by side; if no `planned_sets` exist for the exercise instance, render as today
-
----
-
-#### Planned sets
-
-Templates apply by populating `planned_sets`, not by creating ghost rows in `sets`. The `sets` table remains exclusively actual logged performance — PR logic and history are never contaminated.
-
-**DB changes** (migration v8, alongside templates):
-```sql
-CREATE TABLE planned_sets (
-    id                  INTEGER PRIMARY KEY,
-    workout_exercise_id INTEGER NOT NULL REFERENCES workout_exercises(id),
-    set_order           INTEGER NOT NULL,
-    weight_kg           REAL,    -- nullable: weight not yet decided
-    reps                INTEGER, -- nullable: AMRAP or open-ended
-    notes               TEXT     -- qualitative guidance: "RPE 8", "AMRAP", "~80%"
-);
-```
-
-**Properties**:
-- Per-set granularity: each planned set is its own row, so pyramid sets (60×8, 80×6, 100×4) and wave loading are representable without any hacks
-- Partial plans are valid: a row can have `reps` but no `weight`, or just a `notes` string
-- Applying a template creates `planned_sets` rows; manually planning a session creates them directly
-- On the exercise page, planned set N is matched against actual set N; extra actual sets (exceeded the plan) and missing actual sets (didn't finish) are shown as gaps
-
-**New commands**:
-- `upsert_planned_set(id, workout_exercise_id, set_order, weight_kg, reps, notes)`
-- `delete_planned_set(id)`
-- `get_planned_sets(workout_exercise_id) → Vec<PlannedSet>`
+**Frontend** (`src/lib/DayCard.svelte`):
+- `loadExercises` calls `get_workout_name_for_date` after loading exercises; sets `workoutTitle` to the returned name (falling back to `"Workout"` if null) when a workout exists, or `"Rest day"` when `exercises.length === 0`
+- `workoutTitle` is already bound to the template-name input, so the save-as-template flow pre-fills with the workout name automatically — no other changes needed
+- `workoutId` needed in `saveTemplate` already comes from `get_workout_id_for_date`; no change there
 
 ---
 

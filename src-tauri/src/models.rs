@@ -13,6 +13,12 @@ pub struct Category {
 }
 
 #[derive(Serialize)]
+pub struct Template {
+    pub id: i64,
+    pub name: String,
+}
+
+#[derive(Serialize)]
 pub struct ExerciseWithSets {
     pub exercise_id: i64,
     pub exercise_name: String,

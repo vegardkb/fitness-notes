@@ -16,10 +16,14 @@ use crate::commands::sets::{delete_set, reorder_exercises, reorder_sets, upsert_
 use crate::commands::settings::{
     delete_all_data, get_settings, set_dark_mode, set_height, set_sex,
 };
+use crate::commands::templates::{
+    apply_template, delete_template, list_templates, rename_template, save_workout_as_template,
+};
 use crate::commands::workouts::{
     add_exercise_to_workout, get_active_dates, get_sets_for_workout_exercise,
-    get_workout_exercise_context, get_workout_for_date, get_workouts_for_range,
-    merge_workout_exercises, remove_exercise_from_workout,
+    get_workout_exercise_context, get_workout_for_date, get_workout_id_for_date,
+    get_workout_name_for_date, get_workouts_for_range, merge_workout_exercises,
+    remove_exercise_from_workout,
 };
 
 use tauri::Manager;
@@ -45,6 +49,8 @@ pub fn run() {
             merge_workout_exercises,
             get_active_dates,
             get_workout_for_date,
+            get_workout_id_for_date,
+            get_workout_name_for_date,
             get_workout_exercise_context,
             get_sets_for_workout_exercise,
             upsert_set,
@@ -82,6 +88,11 @@ pub fn run() {
             get_last_measurements_for_date,
             get_measurement_history,
             list_metrics,
+            rename_template,
+            save_workout_as_template,
+            apply_template,
+            delete_template,
+            list_templates,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

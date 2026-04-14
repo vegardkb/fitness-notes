@@ -89,5 +89,5 @@ fn schema_version_is_current() {
     let version: u32 = conn
         .query_row("PRAGMA user_version", [], |r| r.get(0))
         .unwrap();
-    assert_eq!(version, 4);
+    assert_eq!(version, 6);
 }
