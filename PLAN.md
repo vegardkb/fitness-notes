@@ -12,6 +12,7 @@
 - **Workout/exercise model refactor**: Migration v4 — `workout_order` added to `workouts`, unique constraints removed from `workouts.date` and `workout_exercises(workout_id, exercise_id)`, `sets` now references `workout_exercise_id` FK with `exercise_id` kept denormalized. Route is `/exercise/[id]/[we_id]` (deviation from plan: `exercise_id` kept in URL so history/graph/prs sub-routes can resolve it via the shared `[id]` layout without an extra lookup). Long-press select mode in DayCard allows merge and delete of `workout_exercise` instances. `reorder_exercises` recomputes PR flags after reorder.
 - **Migration infrastructure**: `run_migrations()` in `database.rs` with downgrade guard and per-version functions. WAL mode enabled at startup. Automatic daily backups (last 14 kept) on every launch.
 - **Android build & deploy**: App runs on Android via Tauri. Touch targets, DnD, viewport, and file picker verified. Daily iteration via `pnpm tauri android dev` (USB, HMR). Release builds signed via keystore env vars; `deploy.sh` builds and installs in one step.
+- **Workout templates** (`/templates/[date]`): Save any workout as a named template (snapshots exercises + sets); apply to any date to pre-populate a new workout. Template CRUD (list, rename, delete) via `SelectList`. Applying a template recomputes PR flags for each affected exercise. `DayCard` shows a paste icon on rest days and a copy icon on workout days. Workout name column (`workouts.name`, migration v7) is pending — apply will name the workout after the template, and `DayCard` will show the name instead of the generic title.
 
 ---
 
@@ -32,7 +33,29 @@ exercises (
 workouts (
     id            integer primary key,
     date          text not null,
-    workout_order integer not null default 1
+    workout_order integer not null default 1,
+    name          text                         -- nullable;
+)
+
+templates (
+    id   integer primary key,
+    name text not null unique
+)
+
+template_exercises (
+    id             integer primary key,
+    template_id    integer not null references templates(id),
+    exercise_id    integer not null references exercises(id),
+    exercise_order integer not null
+)
+
+template_sets (
+    id                   integer primary key,
+    template_id          integer not null references templates(id),
+    template_exercise_id integer not null references template_exercises(id),
+    set_order            integer not null,
+    weight_kg            real not null,
+    reps                 integer not null
 )
 
 workout_exercises (
@@ -88,8 +111,6 @@ user_settings (
 
 Pending migrations to add as features land:
 ```
-v5–v6: CREATE TABLE templates / template_exercises / template_sets  ← implemented
-v7: ALTER TABLE workouts ADD COLUMN name TEXT
 v8: ALTER TABLE user_settings ADD COLUMN season_start TEXT DEFAULT '01-01'
 v9: ALTER TABLE user_settings ADD COLUMN use_seasons BOOLEAN DEFAULT true
 v10: ALTER TABLE sets ADD COLUMN is_season_pr BOOLEAN DEFAULT false
@@ -117,53 +138,11 @@ Graph and PRs tabs exist in `BodyHeader.svelte` but have no routes yet.
 
 ---
 
-### 8. Workout templates
-
-Save a named list of exercises as a reusable template; apply it to any date to pre-populate the day's workout.
-
-**DB changes** (migrations v5–v6, implemented):
-```sql
-CREATE TABLE templates (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE);
-CREATE TABLE template_exercises (id INTEGER PRIMARY KEY, template_id INTEGER NOT NULL REFERENCES templates(id), exercise_id INTEGER NOT NULL REFERENCES exercises(id), exercise_order INTEGER NOT NULL);
-CREATE TABLE template_sets (id INTEGER PRIMARY KEY, template_id INTEGER NOT NULL REFERENCES templates(id), template_exercise_id INTEGER NOT NULL REFERENCES template_exercises(id), set_order INTEGER NOT NULL, weight_kg REAL NOT NULL, reps INTEGER NOT NULL);
-```
-
-**Commands** (implemented in `src-tauri/src/commands/templates.rs`):
-- `rename_template(id, name)`
-- `save_workout_as_template(workout_id, name)` — snapshots workout_exercises + sets into template tables, wrapped in a transaction
-- `list_templates() → Vec<Template>`
-- `delete_template(template_id)`
-- `apply_template(template_id, date)` — creates workout + workout_exercises + sets from template, then calls `recompute_pr_flags` for each exercise; wrapped in a transaction
-
-**Frontend** (implemented):
-- `src/routes/templates/[date]/+page.svelte` — list and select templates; navigates back to `/?date=`
-- `src/lib/DayCard.svelte` — ClipboardPaste (apply template) when rest day, ClipboardCopy (save as template) when workout exists; template-bar input for naming
-
-#### Workout name (migration v7, not yet implemented)
-
-Workouts get an optional `name` column. The title shown in `DayCard` reflects the workout name; applying a template names the new workout after the template.
-
-**DB change** (migration v7):
-```sql
-ALTER TABLE workouts ADD COLUMN name TEXT;
-```
-
-**Commands**:
-- New `get_workout_name_for_date(date) → Option<String>` in `workouts.rs` — `SELECT name FROM workouts WHERE date = ?1`
-- Update `apply_template_inner` in `templates.rs` — query `SELECT name FROM templates WHERE id = ?1` before inserting the workout, then use it: `INSERT INTO workouts (date, workout_order, name) VALUES (?1, 1, ?2)`
-
-**Frontend** (`src/lib/DayCard.svelte`):
-- `loadExercises` calls `get_workout_name_for_date` after loading exercises; sets `workoutTitle` to the returned name (falling back to `"Workout"` if null) when a workout exists, or `"Rest day"` when `exercises.length === 0`
-- `workoutTitle` is already bound to the template-name input, so the save-as-template flow pre-fills with the workout name automatically — no other changes needed
-- `workoutId` needed in `saveTemplate` already comes from `get_workout_id_for_date`; no change there
-
----
-
-### 9. Season-wise personal bests
+### 8. Season-wise personal bests
 
 A season is a 1-year window starting from a user-configured month/day (MM-DD), recurring annually. The current season = from the most recent occurrence of that date to today.
 
-**DB changes** (migrations v5–v7):
+**DB changes** (migrations v8–v10):
 ```sql
 ALTER TABLE user_settings ADD COLUMN season_start TEXT DEFAULT '01-01';
 ALTER TABLE user_settings ADD COLUMN use_seasons  BOOLEAN DEFAULT true;
@@ -179,11 +158,10 @@ ALTER TABLE sets           ADD COLUMN is_season_pr BOOLEAN DEFAULT false;
 **Frontend**:
 - PRs page (`/exercise/[id]/prs`): add a second column "This season" alongside "All time" for each rep count row. If `use_seasons` is false (settings toggle), hide the season column.
 - Settings page: season start MM-DD input + use_seasons toggle
-- No "SPR" badge on set rows — keep the feed clean
 
 ---
 
-### 10. Analysis page
+### 9. Analysis page
 
 New route `/analysis`. Three sections:
 
@@ -200,7 +178,7 @@ Possible interesting analysis:
 
 ---
 
-### 11. Data safety
+### 10. Data safety
 
 Three layers of protection, all local, no server required.
 
@@ -257,8 +235,8 @@ New Rust commands:
 7. ~~**Android build/test workflow**~~ ✓ done — `tauri android dev` for iteration, `deploy.sh` for release
 8. ~~**Workout/exercise model refactor**~~ ✓ done — workout_exercise_id, exercise repetition, merge/delete via select mode, backend tests
 9. ~~**Settings menu**~~ ✓ done — user profile, dark mode, manual export/restore
-10. **Complete body tracker** (graph + PRs)
-11. **Workout templates** — depends on refactor (section 8)
+10. ~~**Workout templates**~~ ✓ done — save/apply/rename/delete; PR recomputation on apply; workout name column (v7) pending
+11. **Complete body tracker** (graph + PRs)
 12. **Season PRs** — depends on settings
 13. **Analysis page** — most complex, last
 
