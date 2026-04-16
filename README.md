@@ -1,7 +1,13 @@
-# Tauri + SvelteKit + TypeScript
+# fitness-notes
 
-This template should help get you started developing with Tauri, SvelteKit and TypeScript in Vite.
+An iOS/android app for logging and analyzing weightlifting training and body measurements.
 
-## Recommended IDE Setup
+## Architecture
+Uses Tauri.
+Backend: rust, sqlite
+Frontend: svelte
 
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer).
+For details+roadmap, see PLAN.md
+
+## Build instructions
+TODO
