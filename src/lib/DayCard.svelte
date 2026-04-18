@@ -141,8 +141,8 @@
     async function mergeSelectedExercises() {
         let exerciseIds = selectedExercises.map(
             (we_id) =>
-                exercises.find((e) => e.workout_exercise_id === we_id)
-                    ?.exercise_id,
+                exercises.find((e) => e.workout_exercise_id === we_id)?.exercise
+                    .id,
         );
         // Can only merge exercises with the same exercise_id
         const uniqueExerciseIds = new Set(exerciseIds);
@@ -244,7 +244,7 @@
                         selectMode
                             ? selectExercise(ex.workout_exercise_id)
                             : goto(
-                                  `/exercise/${ex.exercise_id}/${ex.workout_exercise_id}`,
+                                  `/exercise/${ex.exercise.id}/${ex.workout_exercise_id}`,
                               )}
                 >
                     <div class="exercise-card-header">
@@ -256,7 +256,7 @@
                             onpointerdown={startDrag}
                             ><GripVertical size={16} strokeWidth={1.5} /></span
                         >
-                        <span>{ex.exercise_name}</span>
+                        <span>{ex.exercise.name}</span>
                         <span class="muted"
                             ><ChevronRight size={16} strokeWidth={1.5} /></span
                         >

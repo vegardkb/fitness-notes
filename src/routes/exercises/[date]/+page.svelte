@@ -7,32 +7,32 @@
     import SelectList from "$lib/SelectList.svelte";
     import { toast } from "$lib/toast";
 
-    import type { Category, Exercise } from "$lib/exercise";
+    import type { NamedId } from "$lib/exercise";
 
     const date = $derived(page.params.date ?? "");
 
     type View =
         | { name: "categories" }
-        | { name: "exercisesInCategory"; category: Category };
+        | { name: "exercisesInCategory"; category: NamedId };
     let view = $state<View>({ name: "categories" });
 
-    let categories = $state<Category[]>([]);
-    let exercisesInCategory = $state<Exercise[]>([]);
+    let categories = $state<NamedId[]>([]);
+    let exercisesInCategory = $state<NamedId[]>([]);
     let creating = $state(false);
 
     let mergeDialog = $state<HTMLDialogElement | null>(null);
-    let mergeFrom = $state<Category | null>(null);
-    let mergeTo = $state<Category | null>(null);
+    let mergeFrom = $state<NamedId | null>(null);
+    let mergeTo = $state<NamedId | null>(null);
 
     let mergeExerciseDialog = $state<HTMLDialogElement | null>(null);
-    let mergeExerciseFrom = $state<Exercise | null>(null);
-    let mergeExerciseTo = $state<Exercise | null>(null);
+    let mergeExerciseFrom = $state<NamedId | null>(null);
+    let mergeExerciseTo = $state<NamedId | null>(null);
 
     onMount(async () => {
         categories = await invoke("list_exercise_categories");
     });
 
-    async function selectCategory(category: Category) {
+    async function selectCategory(category: NamedId) {
         exercisesInCategory = await invoke("list_exercises_in_category", {
             categoryId: category.id,
         });
@@ -163,7 +163,7 @@
         }
     }
 
-    async function selectExercise(exercise: Exercise) {
+    async function selectExercise(exercise: NamedId) {
         let workout_exercise_id = await invoke<number>(
             "add_exercise_to_workout",
             {

@@ -1,27 +1,14 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
-pub struct Exercise {
-    pub id: i64,
-    pub name: String,
-}
-
-#[derive(Serialize)]
-pub struct Category {
+pub struct NamedId {
     pub name: String,
     pub id: i64,
-}
-
-#[derive(Serialize)]
-pub struct Template {
-    pub id: i64,
-    pub name: String,
 }
 
 #[derive(Serialize)]
 pub struct ExerciseWithSets {
-    pub exercise_id: i64,
-    pub exercise_name: String,
+    pub exercise: NamedId,
     pub category: String,
     pub workout_exercise_id: i64,
     pub exercise_order: i64,

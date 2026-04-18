@@ -1,4 +1,4 @@
-use crate::{database::recompute_pr_flags, models::Template};
+use crate::{database::recompute_pr_flags, models::NamedId};
 
 pub fn rename_template_inner(
     conn: &rusqlite::Connection,
@@ -242,13 +242,13 @@ pub fn delete_template(
     delete_template_inner(&conn, template_id)
 }
 
-pub fn list_templates_inner(conn: &rusqlite::Connection) -> Result<Vec<Template>, String> {
+pub fn list_templates_inner(conn: &rusqlite::Connection) -> Result<Vec<NamedId>, String> {
     let mut stmt = conn
         .prepare("SELECT id, name FROM templates ORDER BY name")
         .map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map([], |row| {
-            Ok(Template {
+            Ok(NamedId {
                 id: row.get::<_, i64>(0)?,
                 name: row.get::<_, String>(1)?,
             })
@@ -264,7 +264,7 @@ pub fn list_templates_inner(conn: &rusqlite::Connection) -> Result<Vec<Template>
 #[tauri::command]
 pub fn list_templates(
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<Vec<Template>, String> {
+) -> Result<Vec<NamedId>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     list_templates_inner(&conn)
 }

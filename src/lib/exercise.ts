@@ -24,22 +24,11 @@ export type RepMax = {
 export type ExerciseWithSets = {
   id: number; // alias of exercise_id, required by dndzone
   workout_exercise_id: number;
-  exercise_id: number;
-  exercise_name: string;
+  exercise: NamedId;
   sets: Set[];
 };
 
-export type Template = {
-  id: number;
-  name: string;
-};
-
-export type Category = {
-  id: number;
-  name: string;
-};
-
-export type Exercise = {
+export type NamedId = {
   id: number;
   name: string;
 };

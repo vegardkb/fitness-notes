@@ -6,11 +6,11 @@
     import SelectList from "$lib/SelectList.svelte";
     import { toast } from "$lib/toast";
 
-    import type { Template } from "$lib/exercise";
+    import type { NamedId } from "$lib/exercise";
 
     const date = $derived(page.params.date ?? "");
 
-    let templates = $state<Template[]>([]);
+    let templates = $state<NamedId[]>([]);
 
     const templateActions = [
         { label: "Delete", danger: true, action: deleteTemplate },
@@ -19,7 +19,7 @@
         templates = await invoke("list_templates");
     });
 
-    async function selectTemplate(template: Template) {
+    async function selectTemplate(template: NamedId) {
         try {
             await invoke("apply_template", {
                 templateId: template.id,

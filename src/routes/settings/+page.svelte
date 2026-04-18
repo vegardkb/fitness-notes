@@ -1,9 +1,10 @@
 <script lang="ts">
-    import type { Category } from "$lib/exercise";
+    import type { NamedId } from "$lib/exercise";
+    import type { Metric } from "$lib/body";
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
 
-    import { ArrowLeft, ChevronRight, Circle } from "lucide-svelte";
+    import { ArrowLeft, ChevronRight } from "lucide-svelte";
     import type { Settings } from "$lib/settings";
 
     type ExerciseRow = {
@@ -40,13 +41,6 @@
     type BodyImportResult = {
         measurements_imported: number;
         days_touched: number;
-    };
-    type Exercise = { id: number; name: string };
-    type Metric = {
-        id: number;
-        name: string;
-        unit: string;
-        is_derived: boolean;
     };
 
     type Phase =
@@ -95,8 +89,8 @@
     // Inline exercise picker state
     let pickingFor = $state<string | null>(null);
     let pickerView = $state<"categories" | "exercises">("categories");
-    let pickerCategories = $state<Category[]>([]);
-    let pickerExercises = $state<Exercise[]>([]);
+    let pickerCategories = $state<NamedId[]>([]);
+    let pickerExercises = $state<NamedId[]>([]);
 
     // Inline body metric picker state
     let bodyPickingFor = $state<string | null>(null);
@@ -319,13 +313,13 @@
         }
         pickingFor = csvName;
         pickerView = "categories";
-        pickerCategories = await invoke<Category[]>("list_exercise_categories");
+        pickerCategories = await invoke<NamedId[]>("list_exercise_categories");
         pickerExercises = [];
     }
 
-    async function pickerSelectCategory(cat: Category) {
+    async function pickerSelectCategory(cat: NamedId) {
         pickerView = "exercises";
-        pickerExercises = await invoke<Exercise[]>(
+        pickerExercises = await invoke<NamedId[]>(
             "list_exercises_in_category",
             {
                 categoryId: cat.id,
@@ -333,7 +327,7 @@
         );
     }
 
-    function pickerSelectExercise(ex: Exercise) {
+    function pickerSelectExercise(ex: NamedId) {
         if (phase.name !== "resolving" || !pickingFor) return;
         phase.resolutions[pickingFor] = {
             action: "map",

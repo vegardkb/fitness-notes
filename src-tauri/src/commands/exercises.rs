@@ -1,26 +1,22 @@
 use crate::database::recompute_pr_flags;
-use crate::models::{
-    Category, DatedValue, DayWorkout, Exercise, ExerciseWithSets, RepMax, Set, SetMinimal,
-};
+use crate::models::{DatedValue, DayWorkout, ExerciseWithSets, NamedId, RepMax, Set, SetMinimal};
 use rusqlite::OptionalExtension;
 
-pub fn list_exercise_categories_inner(
-    conn: &rusqlite::Connection,
-) -> Result<Vec<Category>, String> {
+pub fn list_exercise_categories_inner(conn: &rusqlite::Connection) -> Result<Vec<NamedId>, String> {
     let mut stmt = conn
         .prepare("SELECT name, id FROM categories")
         .map_err(|e| e.to_string())?;
 
     let rows = stmt
         .query_map(rusqlite::params![], |row| {
-            Ok(Category {
+            Ok(NamedId {
                 name: row.get(0)?,
                 id: row.get(1)?,
             })
         })
         .map_err(|e| e.to_string())?;
 
-    let mut result: Vec<Category> = Vec::new();
+    let mut result: Vec<NamedId> = Vec::new();
     for row in rows {
         result.push(row.map_err(|e| e.to_string())?);
     }
@@ -31,7 +27,7 @@ pub fn list_exercise_categories_inner(
 #[tauri::command]
 pub fn list_exercise_categories(
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<Vec<Category>, String> {
+) -> Result<Vec<NamedId>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     list_exercise_categories_inner(&conn)
 }
@@ -39,7 +35,7 @@ pub fn list_exercise_categories(
 pub fn list_exercises_in_category_inner(
     conn: &rusqlite::Connection,
     category_id: i64,
-) -> Result<Vec<Exercise>, String> {
+) -> Result<Vec<NamedId>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT e.id, e.name FROM exercises e
@@ -49,7 +45,7 @@ pub fn list_exercises_in_category_inner(
         .map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map(rusqlite::params![category_id], |row| {
-            Ok(Exercise {
+            Ok(NamedId {
                 id: row.get(0)?,
                 name: row.get(1)?,
             })
@@ -62,7 +58,7 @@ pub fn list_exercises_in_category_inner(
 pub fn list_exercises_in_category(
     category_id: i64,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<Vec<Exercise>, String> {
+) -> Result<Vec<NamedId>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     list_exercises_in_category_inner(&conn, category_id)
 }
@@ -326,12 +322,12 @@ pub fn merge_category_into_existing(
     merge_category_into_existing_inner(&mut conn, from_id, to_id)
 }
 
-pub fn get_exercise_inner(conn: &rusqlite::Connection, id: i64) -> Result<Exercise, String> {
+pub fn get_exercise_inner(conn: &rusqlite::Connection, id: i64) -> Result<NamedId, String> {
     conn.query_row(
         "SELECT id, name FROM exercises WHERE id = ?1",
         rusqlite::params![id],
         |row| {
-            Ok(Exercise {
+            Ok(NamedId {
                 id: row.get(0)?,
                 name: row.get(1)?,
             })
@@ -344,7 +340,7 @@ pub fn get_exercise_inner(conn: &rusqlite::Connection, id: i64) -> Result<Exerci
 pub fn get_exercise(
     id: i64,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<Exercise, String> {
+) -> Result<NamedId, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     get_exercise_inner(&conn, id)
 }
@@ -427,10 +423,12 @@ pub fn get_exercise_history_inner(
         };
 
         match day.exercises.last_mut() {
-            Some(ex) if ex.exercise_id == exercise_id => ex.sets.push(set),
+            Some(ex) if ex.exercise.id == exercise_id => ex.sets.push(set),
             _ => day.exercises.push(ExerciseWithSets {
-                exercise_id,
-                exercise_name,
+                exercise: NamedId {
+                    name: (exercise_name),
+                    id: (exercise_id),
+                },
                 category,
                 workout_exercise_id,
                 exercise_order,

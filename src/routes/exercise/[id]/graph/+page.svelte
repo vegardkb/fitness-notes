@@ -4,7 +4,7 @@
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
     import { todayStr, formatDateLong } from "$lib/date";
-    import { formatWeight, type Category } from "$lib/exercise";
+    import { formatWeight, type NamedId } from "$lib/exercise";
 
     type DataPoint = { date: string; value: number };
     type Exercise = { id: number; name: string };
@@ -37,8 +37,8 @@
     const toDate = $derived(todayStr());
 
     // Exercise switcher
-    let categories = $state<Category[]>([]);
-    let selectedCategory = $state<Category | undefined>(undefined);
+    let categories = $state<NamedId[]>([]);
+    let selectedCategory = $state<NamedId | undefined>(undefined);
     let categoryExercises = $state<Exercise[]>([]);
     let selectedExercise = $state<Exercise | undefined>(undefined);
 
@@ -93,7 +93,7 @@
     });
 
     onMount(async () => {
-        categories = await invoke<Category[]>("list_exercise_categories");
+        categories = await invoke<NamedId[]>("list_exercise_categories");
     });
 
     // ── Chart geometry ────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-use crate::models::{DayWorkout, ExerciseWithSets, Set, WorkoutExerciseContext};
+use crate::models::{DayWorkout, ExerciseWithSets, NamedId, Set, WorkoutExerciseContext};
 use rusqlite::OptionalExtension;
 
 pub fn get_workout_for_date_inner(
@@ -35,8 +35,10 @@ pub fn get_workout_for_date_inner(
             row.map_err(|e| e.to_string())?;
 
         let mut ex_with_sets = ExerciseWithSets {
-            exercise_id,
-            exercise_name,
+            exercise: NamedId {
+                id: exercise_id,
+                name: exercise_name,
+            },
             category,
             workout_exercise_id,
             exercise_order,
@@ -248,10 +250,12 @@ pub fn get_workouts_for_range_inner(
         };
 
         match day.exercises.last_mut() {
-            Some(ex) if ex.exercise_id == exercise_id => ex.sets.push(set),
+            Some(ex) if ex.exercise.id == exercise_id => ex.sets.push(set),
             _ => day.exercises.push(ExerciseWithSets {
-                exercise_id,
-                exercise_name,
+                exercise: NamedId {
+                    id: exercise_id,
+                    name: exercise_name,
+                },
                 category,
                 workout_exercise_id,
                 exercise_order,
