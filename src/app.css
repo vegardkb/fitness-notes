@@ -629,7 +629,7 @@ h1,
 
 .graph-chart {
     width: 100%;
-    overflow: visible;
+    height: 260px;
 }
 
 .graph-tooltip {
