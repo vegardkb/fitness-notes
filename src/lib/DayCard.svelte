@@ -1,6 +1,6 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import { invoke } from "@tauri-apps/api/core";
+    import { invoke } from "$lib/tauri";
     import { selectionFeedback } from "@tauri-apps/plugin-haptics";
     import { toast } from "$lib/toast";
 

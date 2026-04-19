@@ -1,7 +1,7 @@
 <script lang="ts">
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
-    import { invoke } from "@tauri-apps/api/core";
+    import { invoke } from "$lib/tauri";
     import { onMount } from "svelte";
     import { formatDate } from "$lib/date";
     import type { DayWorkout } from "$lib/exercise";
@@ -39,7 +39,9 @@
                             goto(`/exercise/${exerciseId}/${day.date}`)}
                     >
                         <span>{formatDate(day.date)}</span>
-                        <span class="muted"><ChevronRight size={16} strokeWidth={1.5} /></span>
+                        <span class="muted"
+                            ><ChevronRight size={16} strokeWidth={1.5} /></span
+                        >
                     </button>
                     <div class="exercise-card-sets">
                         {#each day.exercises[0].sets as set, i}

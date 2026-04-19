@@ -3,7 +3,7 @@
     import { scaleTime, scaleLinear } from "d3-scale";
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
-    import { invoke } from "@tauri-apps/api/core";
+    import { invoke } from "$lib/tauri";
     import { onMount } from "svelte";
     import { todayStr, formatDateLong } from "$lib/date";
     import { formatWeight, type NamedId } from "$lib/exercise";

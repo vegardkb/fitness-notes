@@ -7,7 +7,7 @@
     import { onMount } from "svelte";
     import { onNavigate } from "$app/navigation";
     import Toaster from "$lib/Toaster.svelte";
-    import { invoke } from "@tauri-apps/api/core";
+    import { invoke } from "$lib/tauri";
     import type { Settings } from "$lib/settings";
 
     let { children } = $props();

@@ -1,7 +1,7 @@
 <script lang="ts">
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
-    import { invoke } from "@tauri-apps/api/core";
+    import { invoke } from "$lib/tauri";
     import { onMount } from "svelte";
     import PlusIcon from "$lib/icons/PlusIcon.svelte";
     import SelectList from "$lib/SelectList.svelte";

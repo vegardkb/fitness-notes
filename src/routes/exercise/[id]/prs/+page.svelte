@@ -1,6 +1,6 @@
 <script lang="ts">
     import { page } from "$app/state";
-    import { invoke } from "@tauri-apps/api/core";
+    import { invoke } from "$lib/tauri";
     import { onMount } from "svelte";
     import type { RepMax } from "$lib/exercise";
     import { formatWeight } from "$lib/exercise";

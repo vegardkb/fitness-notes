@@ -12,3 +12,5 @@ debug.keystore
 CLAUDE.md
 src-tauri/gen/
 .idea/
+# Playwright
+test-results

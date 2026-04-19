@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { NamedId } from "$lib/exercise";
     import type { Metric } from "$lib/body";
-    import { invoke } from "@tauri-apps/api/core";
+    import { invoke } from "$lib/tauri";
     import { onMount } from "svelte";
 
     import { ArrowLeft, ChevronRight } from "lucide-svelte";

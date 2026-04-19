@@ -1,7 +1,7 @@
 <script lang="ts">
     import { page } from "$app/state";
     import { onMount } from "svelte";
-    import { invoke } from "@tauri-apps/api/core";
+    import { invoke } from "$lib/tauri";
     import ExerciseHeader from "$lib/ExerciseHeader.svelte";
     import type { WorkoutExerciseContext } from "$lib/exercise";
     import { exerciseHrefs } from "$lib/exercise";
