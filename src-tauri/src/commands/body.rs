@@ -1,4 +1,6 @@
-use crate::models::{DayMeasurement, DerivedMetricIds, Measurement, Metric, Settings, Sex};
+use crate::models::{
+    DatedValue, DayMeasurement, DerivedMetricIds, Measurement, Metric, Settings, Sex,
+};
 
 use crate::commands::settings::get_settings_inner;
 
@@ -265,6 +267,105 @@ pub fn get_measurements_for_date(
 ) -> Result<Vec<Measurement>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     get_measurements_for_date_inner(&conn, date)
+}
+
+pub fn get_measurements_graph_data_inner(
+    conn: &rusqlite::Connection,
+    metric_id: i64,
+    from_date: &str,
+    to_date: &str,
+) -> Result<Vec<DatedValue>, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT bm.name, b.value, bm.unit, bm.id, b.id, b.date
+                FROM body_measurements b
+                JOIN body_metrics bm ON b.measure_id = bm.id
+                WHERE b.date BETWEEN ?1 AND ?2
+                ORDER BY b.date DESC, bm.name",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map(rusqlite::params![from_date, to_date], |row| {
+            Ok((
+                row.get::<_, String>(0)?, // metric name
+                row.get::<_, f64>(1)?,    // value
+                row.get::<_, String>(2)?, // unit of measurement
+                row.get::<_, i64>(3)?,    // metric id
+                row.get::<_, i64>(4)?,    // body measurement id
+                row.get::<_, String>(5)?, // date
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut result: Vec<DayMeasurement> = Vec::new();
+    for row in rows {
+        let (metric_name, value, unit, metric_id, id, date) = row.map_err(|e| e.to_string())?;
+        let metric = Metric {
+            name: metric_name,
+            unit,
+            id: metric_id,
+            is_derived: false,
+        };
+        let measurement = Measurement {
+            metric,
+            value,
+            date: Some(date.clone()),
+            id: Some(id),
+        };
+
+        let day = match result.last_mut() {
+            Some(d) if d.date == date => d,
+            _ => {
+                result.push(DayMeasurement {
+                    date: date.clone(),
+                    measurements: Vec::new(),
+                });
+                result.last_mut().unwrap()
+            }
+        };
+        day.measurements.push(measurement);
+    }
+
+    let derived_metrics = get_derived_metric_ids(conn)?;
+    let settings = get_settings_inner(conn)?;
+    for day in &mut result {
+        let derived_result =
+            calculate_derived_metrics(&settings, &day.measurements, &derived_metrics);
+        for m in derived_result {
+            day.measurements.push(m);
+        }
+    }
+    let result = result
+        .iter()
+        .filter(|d| {
+            d.date >= from_date.to_string()
+                && d.date <= to_date.to_string()
+                && d.measurements.iter().any(|m| m.metric.id == metric_id)
+        })
+        .map(|d| DatedValue {
+            date: d.date.clone(),
+            value: d
+                .measurements
+                .iter()
+                .find(|m| m.metric.id == metric_id)
+                .map(|m| m.value)
+                .unwrap_or_default(),
+        })
+        .collect();
+
+    Ok(result)
+}
+
+#[tauri::command]
+pub fn get_measurements_graph_data(
+    metric_id: i64,
+    from_date: &str,
+    to_date: &str,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<Vec<DatedValue>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    get_measurements_graph_data_inner(&conn, metric_id, from_date, to_date)
 }
 
 pub fn list_metrics_inner(conn: &rusqlite::Connection) -> Result<Vec<Metric>, String> {

@@ -345,6 +345,68 @@ pub fn get_exercise(
     get_exercise_inner(&conn, id)
 }
 
+pub fn get_exercise_category_inner(
+    conn: &rusqlite::Connection,
+    id: i64,
+) -> Result<NamedId, String> {
+    conn.query_row(
+        "SELECT c.id, c.name FROM categories c
+        JOIN exercises e ON c.id = e.category_id
+        WHERE e.id = ?1",
+        rusqlite::params![id],
+        |row| {
+            Ok(NamedId {
+                id: row.get(0)?,
+                name: row.get(1)?,
+            })
+        },
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_exercise_category(
+    id: i64,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<NamedId, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    get_exercise_category_inner(&conn, id)
+}
+
+pub fn get_last_workout_exercise_inner(
+    conn: &rusqlite::Connection,
+    exercise_id: i64,
+) -> Result<Option<i64>, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT we.id FROM workout_exercises we
+             JOIN workouts w ON w.id = we.workout_id
+             WHERE we.exercise_id = ?1
+             ORDER BY w.date DESC
+             LIMIT 1",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let row = stmt
+        .query_row(rusqlite::params![exercise_id], |row| {
+            Ok((row.get::<_, i64>(0)?))
+        })
+        .optional()
+        .map_err(|e| e.to_string())?;
+    Ok(row)
+}
+
+#[tauri::command]
+pub fn get_last_workout_exercise(
+    exercise_id: i64,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<Option<i64>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let row = get_last_workout_exercise_inner(&conn, exercise_id);
+    dbg!("get_last_workout_exercise", &row);
+    row
+}
+
 pub fn get_exercise_history_inner(
     conn: &rusqlite::Connection,
     exercise_id: i64,

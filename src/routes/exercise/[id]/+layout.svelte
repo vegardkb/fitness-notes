@@ -1,6 +1,5 @@
 <script lang="ts">
     import { page } from "$app/state";
-    import { onMount } from "svelte";
     import { invoke } from "$lib/tauri";
     import ExerciseHeader from "$lib/ExerciseHeader.svelte";
     import type { WorkoutExerciseContext } from "$lib/exercise";
@@ -14,9 +13,20 @@
         date: "",
     });
 
-    const workoutExerciseId = $derived(
-        Number(page.params.we_id ?? page.url.searchParams.get("from") ?? 0),
-    );
+    let workoutExerciseId = $state(0);
+
+    $effect(() => {
+        if (page.params.we_id) {
+            workoutExerciseId = Number(page.params.we_id);
+        } else {
+            invoke<number>("get_last_workout_exercise", {
+                exerciseId: exerciseId,
+            }).then((id) => {
+                workoutExerciseId = id;
+            });
+        }
+    });
+
     const activeTab = $derived(
         page.route.id?.endsWith("/history")
             ? "history"
@@ -38,14 +48,14 @@
     let exerciseName: string = $derived(workoutExerciseContext.exercise_name);
     let date: string = $derived(workoutExerciseContext.date);
 
-    onMount(async () => {
-        workoutExerciseContext = await invoke<WorkoutExerciseContext>(
-            "get_workout_exercise_context",
-            {
-                workoutExerciseId,
-            },
-        );
-        console.log(workoutExerciseContext);
+    $effect(() => {
+        console.log(workoutExerciseId);
+        invoke<WorkoutExerciseContext>("get_workout_exercise_context", {
+            workoutExerciseId,
+        }).then((context) => {
+            workoutExerciseContext = context;
+            console.log(workoutExerciseContext);
+        });
     });
 </script>
 

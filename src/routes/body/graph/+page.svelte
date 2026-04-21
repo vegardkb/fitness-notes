@@ -2,11 +2,14 @@
     import { LayerCake, Svg } from "layercake";
     import { scaleTime, scaleLinear } from "d3-scale";
     import { page } from "$app/state";
-    import { goto } from "$app/navigation";
     import { invoke } from "$lib/tauri";
     import { onMount } from "svelte";
     import { todayStr, formatDateLong } from "$lib/date";
-    import { formatWeight, type NamedId } from "$lib/exercise";
+    import { formatWeight } from "$lib/exercise";
+    import type { Metric } from "$lib/body";
+    import { bodyHrefs } from "$lib/body";
+    import BodyHeader from "$lib/BodyHeader.svelte";
+
     import Line from "$lib/chart/Line.svelte";
     import Points from "$lib/chart/Points.svelte";
     import AxisX from "$lib/chart/AxisX.svelte";
@@ -20,10 +23,10 @@
         return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
     }
 
-    const exerciseId = $derived(Number(page.params.id ?? "0"));
     const date = $derived(page.url.searchParams.get("from") ?? "");
+    const hrefs = $derived(bodyHrefs(date));
 
-    let exerciseName = $state("");
+    let exerciseName = "Body Tracker";
     let data = $state<DataPoint[]>([]);
     let loading = $state(false);
 
@@ -41,52 +44,19 @@
 
     const toDate = $derived(todayStr());
 
-    // Exercise switcher
-    let categories = $state<NamedId[]>([]);
-    let selectedCategoryId = $state<number | undefined>(undefined);
-    let categoryExercises = $state<NamedId[]>([]);
-    let selectedExerciseId = $state<number | undefined>(undefined);
-
-    $effect(() => {
-        if (!selectedCategoryId) return;
-        invoke<NamedId[]>("list_exercises_in_category", {
-            categoryId: selectedCategoryId,
-        }).then((exs) => {
-            categoryExercises = exs;
-            selectedExerciseId = undefined;
-        });
-    });
-
-    $effect(() => {
-        const newId = selectedExerciseId;
-        if (newId && newId !== exerciseId) {
-            selectedExerciseId = undefined;
-            const ctx = date;
-            goto(
-                ctx
-                    ? `/exercise/${newId}/graph?from=${ctx}`
-                    : `/exercise/${newId}/graph`,
-            );
-        }
-    });
-
-    // Update exercise name whenever the exercise changes (e.g. via switcher navigation)
-    $effect(() => {
-        const id = selectedExerciseId;
-        if (!id) return;
-        invoke<NamedId>("get_exercise", { id }).then((ex) => {
-            exerciseName = ex.name;
-        });
-    });
+    // Metric switcher
+    let metrics = $state<Metric[]>([]);
+    let selectedMetric = $state<number | undefined>(undefined);
 
     // Load graph data whenever exerciseId or date range changes
     $effect(() => {
-        const id = exerciseId;
+        const id = selectedMetric;
+
         const from = fromDate;
         const to = toDate;
         loading = true;
-        invoke<DataPoint[]>("get_exercise_graph_data", {
-            exerciseId: id,
+        invoke<DataPoint[]>("get_measurements_graph_data", {
+            metricId: id,
             fromDate: from,
             toDate: to,
         })
@@ -99,7 +69,7 @@
     });
 
     onMount(async () => {
-        categories = await invoke<NamedId[]>("list_exercise_categories");
+        metrics = await invoke<Metric[]>("list_metrics");
     });
 
     // Tooltip state
@@ -112,6 +82,16 @@
 </script>
 
 <div class="body">
+    <BodyHeader
+        feedHref={hrefs.feedHref}
+        logHref={hrefs.logHref}
+        historyHref={hrefs.historyHref}
+        graphHref={hrefs.graphHref}
+        prsHref={hrefs.prsHref}
+        activeTab="history"
+        {date}
+    />
+
     <div class="graph-ranges">
         {#each ["1M", "1Y", "3Y", "All"] as const as r}
             <button
@@ -125,20 +105,10 @@
     </div>
 
     <div class="graph-switcher">
-        <select bind:value={selectedCategoryId} aria-label="Category">
-            <option value="">Category…</option>
-            {#each categories as cat}
-                <option value={cat.id}>{cat.name}</option>
-            {/each}
-        </select>
-        <select
-            bind:value={selectedExerciseId}
-            disabled={categoryExercises.length === 0}
-            aria-label="Exercise"
-        >
-            <option value="">Exercise…</option>
-            {#each categoryExercises as ex}
-                <option value={ex.id}>{ex.name}</option>
+        <select bind:value={selectedMetric} aria-label="BodyMetric">
+            <option value="">Metric…</option>
+            {#each metrics as metric}
+                <option value={metric.id}>{metric.name}</option>
             {/each}
         </select>
     </div>
