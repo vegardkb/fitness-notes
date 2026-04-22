@@ -1,5 +1,5 @@
 use crate::models::{
-    DatedValue, DayMeasurement, DerivedMetricIds, Measurement, Metric, Settings, Sex,
+    DatedValue, DayMeasurement, DerivedMetricIds, Measurement, Metric, MetricRange, Settings, Sex,
 };
 
 use crate::commands::settings::get_settings_inner;
@@ -366,6 +366,36 @@ pub fn get_measurements_graph_data(
 ) -> Result<Vec<DatedValue>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     get_measurements_graph_data_inner(&conn, metric_id, from_date, to_date)
+}
+
+pub fn get_body_min_maxes_inner(conn: &rusqlite::Connection) -> Result<Vec<MetricRange>, String> {
+    let day_measurements = get_measurement_history_inner(conn)?;
+    let metrics = list_metrics_inner(conn)?;
+    let out = metrics
+        .into_iter()
+        .map(|m| {
+            let measurements: Vec<Measurement> = day_measurements
+                .iter()
+                .flat_map(|dm| dm.measurements.iter())
+                .filter(|dm| dm.metric.id == m.id)
+                .cloned()
+                .collect();
+            MetricRange {
+                metric: m,
+                min: measurements.iter().min_by_key(|m| m.value as i64).cloned(),
+                max: measurements.iter().max_by_key(|m| m.value as i64).cloned(),
+            }
+        })
+        .collect();
+    Ok(out)
+}
+
+#[tauri::command]
+pub fn get_body_min_maxes(
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<Vec<MetricRange>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    get_body_min_maxes_inner(&conn)
 }
 
 pub fn list_metrics_inner(conn: &rusqlite::Connection) -> Result<Vec<Metric>, String> {

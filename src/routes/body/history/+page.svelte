@@ -1,37 +1,19 @@
 <script lang="ts">
-    import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import { invoke } from "$lib/tauri";
     import { onMount } from "svelte";
     import { formatDate } from "$lib/date";
     import type { DayMeasurement } from "$lib/body";
-    import BodyHeader from "$lib/BodyHeader.svelte";
-    import { bodyHrefs } from "$lib/body";
     import { ChevronRight } from "lucide-svelte";
-
-    const date = $derived(page.url.searchParams.get("from") ?? "");
-    const hrefs = $derived(bodyHrefs(date));
 
     let history = $state<DayMeasurement[]>([]);
 
     onMount(async () => {
-        history = await invoke<DayMeasurement[]>("get_measurement_history", {
-            date,
-        });
+        history = await invoke<DayMeasurement[]>("get_measurement_history", {});
     });
 </script>
 
 <div class="page">
-    <BodyHeader
-        feedHref={hrefs.feedHref}
-        logHref={hrefs.logHref}
-        historyHref={hrefs.historyHref}
-        graphHref={hrefs.graphHref}
-        prsHref={hrefs.prsHref}
-        activeTab="history"
-        {date}
-    />
-
     {#if history.length === 0}
         <p class="empty">No sessions logged yet.</p>
     {:else}

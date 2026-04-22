@@ -1,6 +1,7 @@
 use crate::commands::body::{
-    delete_body_measurement, get_last_measurements_for_date, get_measurement_history,
-    get_measurements_for_date, get_measurements_graph_data, list_metrics, upsert_body_measurement,
+    delete_body_measurement, get_body_min_maxes, get_last_measurements_for_date,
+    get_measurement_history, get_measurements_for_date, get_measurements_graph_data, list_metrics,
+    upsert_body_measurement,
 };
 use crate::commands::exercises::{
     create_category, create_exercise, delete_category, delete_exercise, get_exercise,
@@ -60,6 +61,7 @@ pub fn run() {
             get_last_measurements_for_date,
             get_measurement_history,
             get_measurements_graph_data,
+            get_body_min_maxes,
             get_workouts_for_range,
             get_settings,
             get_last_workout_exercise,

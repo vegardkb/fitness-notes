@@ -80,6 +80,13 @@ pub struct Measurement {
 }
 
 #[derive(Serialize, Debug, Clone)]
+pub struct MetricRange {
+    pub metric: Metric,
+    pub min: Option<Measurement>,
+    pub max: Option<Measurement>,
+}
+
+#[derive(Serialize, Debug, Clone)]
 pub struct Metric {
     pub name: String,
     pub unit: String,

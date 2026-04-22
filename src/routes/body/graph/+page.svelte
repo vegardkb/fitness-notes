@@ -1,14 +1,11 @@
 <script lang="ts">
     import { LayerCake, Svg } from "layercake";
     import { scaleTime, scaleLinear } from "d3-scale";
-    import { page } from "$app/state";
     import { invoke } from "$lib/tauri";
     import { onMount } from "svelte";
     import { todayStr, formatDateLong } from "$lib/date";
     import { formatWeight } from "$lib/exercise";
     import type { Metric } from "$lib/body";
-    import { bodyHrefs } from "$lib/body";
-    import BodyHeader from "$lib/BodyHeader.svelte";
 
     import Line from "$lib/chart/Line.svelte";
     import Points from "$lib/chart/Points.svelte";
@@ -23,10 +20,6 @@
         return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
     }
 
-    const date = $derived(page.url.searchParams.get("from") ?? "");
-    const hrefs = $derived(bodyHrefs(date));
-
-    let exerciseName = "Body Tracker";
     let data = $state<DataPoint[]>([]);
     let loading = $state(false);
 
@@ -47,6 +40,10 @@
     // Metric switcher
     let metrics = $state<Metric[]>([]);
     let selectedMetric = $state<number | undefined>(undefined);
+    let metricName = $derived.by(() => {
+        const metric = metrics.find((m) => m.id === selectedMetric);
+        return metric ? metric.name : "";
+    });
 
     // Load graph data whenever exerciseId or date range changes
     $effect(() => {
@@ -82,16 +79,6 @@
 </script>
 
 <div class="body">
-    <BodyHeader
-        feedHref={hrefs.feedHref}
-        logHref={hrefs.logHref}
-        historyHref={hrefs.historyHref}
-        graphHref={hrefs.graphHref}
-        prsHref={hrefs.prsHref}
-        activeTab="history"
-        {date}
-    />
-
     <div class="graph-ranges">
         {#each ["1M", "1Y", "3Y", "All"] as const as r}
             <button
@@ -128,7 +115,7 @@
                 padding={{ top: 12, right: 16, bottom: 28, left: 44 }}
                 yNice
             >
-                <Svg label="1RM chart for {exerciseName}">
+                <Svg label="Chart for {metricName}">
                     <AxisY format={(v) => formatWeight(v)} />
                     <AxisX />
                     <Line />

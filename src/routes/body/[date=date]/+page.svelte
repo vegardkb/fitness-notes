@@ -2,14 +2,11 @@
     import { page } from "$app/state";
     import { invoke } from "$lib/tauri";
     import { onMount } from "svelte";
-    import { bodyHrefs } from "$lib/body";
 
-    import BodyHeader from "$lib/BodyHeader.svelte";
     import type { Measurement, Metric } from "$lib/body";
     import { SquareMinus, SquarePlus, Circle } from "lucide-svelte";
 
     const date = $derived(page.params.date ?? "");
-    const hrefs = $derived(bodyHrefs(date));
 
     let measurements = $state<Measurement[]>([]);
     let measurementsFilled = $state<Measurement[]>([]);
@@ -106,16 +103,6 @@
 </script>
 
 <div class="page">
-    <BodyHeader
-        feedHref={hrefs.feedHref}
-        logHref={hrefs.logHref}
-        historyHref={hrefs.historyHref}
-        graphHref={hrefs.graphHref}
-        prsHref={hrefs.prsHref}
-        activeTab="log"
-        {date}
-    />
-
     <table class="body-grid">
         <thead>
             <tr class="body-row">
