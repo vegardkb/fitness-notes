@@ -339,8 +339,8 @@ pub fn get_measurements_graph_data_inner(
     let result = result
         .iter()
         .filter(|d| {
-            d.date >= from_date.to_string()
-                && d.date <= to_date.to_string()
+            d.date.as_str() >= from_date
+                && d.date.as_str() <= to_date
                 && d.measurements.iter().any(|m| m.metric.id == metric_id)
         })
         .map(|d| DatedValue {

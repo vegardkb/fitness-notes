@@ -388,9 +388,7 @@ pub fn get_last_workout_exercise_inner(
         .map_err(|e| e.to_string())?;
 
     let row = stmt
-        .query_row(rusqlite::params![exercise_id], |row| {
-            Ok((row.get::<_, i64>(0)?))
-        })
+        .query_row(rusqlite::params![exercise_id], |row| row.get::<_, i64>(0))
         .optional()
         .map_err(|e| e.to_string())?;
     Ok(row)

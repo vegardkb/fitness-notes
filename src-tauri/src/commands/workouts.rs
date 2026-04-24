@@ -133,7 +133,7 @@ pub fn get_workout_id_for_date_inner(
 ) -> Result<Option<i64>, String> {
     let row = conn
         .query_row("SELECT id FROM workouts WHERE date = ?1", [date], |row| {
-            Ok(row.get::<_, i64>(0)?)
+            row.get::<_, i64>(0)
         })
         .optional()
         .map_err(|e| e.to_string())?;
@@ -155,7 +155,7 @@ pub fn get_workout_name_for_date_inner(
 ) -> Result<Option<String>, String> {
     let row = conn
         .query_row("SELECT name FROM workouts WHERE date = ?1", [date], |row| {
-            Ok(row.get::<_, String>(0)?)
+            row.get::<_, String>(0)
         })
         .optional()
         .map_err(|e| e.to_string())?;
