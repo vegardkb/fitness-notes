@@ -18,6 +18,8 @@
     "@fontsource/source-serif-4": "^5.2.9",
     "@radix-ui/colors": "^3.0.0",
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "~2.7.0",
+    "@tauri-apps/plugin-fs": "~2.5.0",
     "@tauri-apps/plugin-haptics": "~2",
     "@tauri-apps/plugin-opener": "^2",
     "d3-scale": "^4.0.2",

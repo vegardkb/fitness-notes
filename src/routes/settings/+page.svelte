@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { save } from "@tauri-apps/plugin-dialog";
+    import { writeFile } from "@tauri-apps/plugin-fs";
     import type { NamedId } from "$lib/exercise";
     import type { Metric } from "$lib/body";
     import { invoke } from "$lib/tauri";
@@ -9,6 +11,7 @@
 
     type ExerciseRow = {
         date: string;
+        workout_name: string;
         exercise_name: string;
         category_name: string;
         weight_kg: number;
@@ -73,11 +76,13 @@
               dateCount: number;
           }
         | { name: "body_importing" }
-        | { name: "body_done"; result: BodyImportResult };
+        | { name: "body_done"; result: BodyImportResult }
+        | { name: "export_done"; path: string };
 
     let phase = $state<Phase>({ name: "idle" });
     let fileInput = $state<HTMLInputElement>();
     let bodyFileInput = $state<HTMLInputElement>();
+    let fileKind = $state<string>("");
 
     let confirmingDelete = $state(false);
 
@@ -153,8 +158,9 @@
         if (fileInput) fileInput.value = "";
 
         try {
-            const result = await invoke<ParseResult>("parse_fitnotes_csv", {
+            const result = await invoke<ParseResult>("parse_exercise_csv", {
                 csvText: text,
+                kind: fileKind,
             });
             if (result.unknown_exercises.length === 0) {
                 const resolvedRows = buildResolvedRows(result.rows, {});
@@ -192,6 +198,7 @@
                 "parse_body_measurements_csv",
                 {
                     csv: text,
+                    kind: fileKind,
                 },
             );
             if (result.unknown_metrics.length === 0) {
@@ -220,6 +227,32 @@
         }
     }
 
+    async function handleFileOutput() {
+        const path = await save({
+            filters: [{ name: "csv file", extensions: ["csv"] }],
+            defaultPath: "fitness-notes-export.csv",
+        });
+        console.log(path);
+        const data = await invoke<string>("export_exercise", {});
+        if (path) {
+            await writeFile(path, new TextEncoder().encode(data));
+            phase = { name: "export_done", path };
+        }
+    }
+
+    async function handleBodyFileOutput() {
+        const path = await save({
+            filters: [{ name: "csv file", extensions: ["csv"] }],
+            defaultPath: "fitness-notes-body-export.csv",
+        });
+        console.log(path);
+        const data = await invoke<string>("export_body", {});
+        if (path) {
+            await writeFile(path, new TextEncoder().encode(data));
+            phase = { name: "export_done", path };
+        }
+    }
+
     function continueToConfirm() {
         if (phase.name !== "resolving") return;
         const resolvedRows = buildResolvedRows(phase.rows, phase.resolutions);
@@ -237,7 +270,7 @@
         const rows = phase.resolvedRows;
         phase = { name: "importing" };
         try {
-            const result = await invoke<ImportResult>("import_fitnotes_rows", {
+            const result = await invoke<ImportResult>("import_exercise_rows", {
                 rows,
             });
             phase = { name: "done", result };
@@ -432,12 +465,15 @@
             </div>
         </div>
         <div class="settings-section">
-            <h2 class="settings-section-title">Import</h2>
+            <h2 class="settings-section-title">Import/Export</h2>
             <div class="settings-row">
                 <span>FitNotes CSV</span>
                 <button
                     class="add-btn-inline"
-                    onclick={() => fileInput?.click()}
+                    onclick={() => {
+                        fileKind = "FitNotes";
+                        fileInput?.click();
+                    }}
                 >
                     Import CSV
                 </button>
@@ -446,9 +482,54 @@
                 <span>FitNotes Body Tracker CSV</span>
                 <button
                     class="add-btn-inline"
-                    onclick={() => bodyFileInput?.click()}
+                    onclick={() => {
+                        fileKind = "FitNotes";
+                        bodyFileInput?.click();
+                    }}
                 >
                     Import CSV
+                </button>
+            </div>
+            <div class="settings-row">
+                <span>fitness-notes CSV</span>
+                <button
+                    class="add-btn-inline"
+                    onclick={() => {
+                        fileKind = "FitnessNotes";
+                        fileInput?.click();
+                    }}
+                >
+                    Import CSV
+                </button>
+            </div>
+            <div class="settings-row">
+                <span>fitness-notes body CSV</span>
+                <button
+                    class="add-btn-inline"
+                    onclick={() => {
+                        fileKind = "FitnessNotes";
+                        bodyFileInput?.click();
+                    }}
+                >
+                    Import CSV
+                </button>
+            </div>
+            <div class="settings-row">
+                <span>Exercise CSV</span>
+                <button
+                    class="add-btn-inline"
+                    onclick={() => handleFileOutput()}
+                >
+                    Export CSV
+                </button>
+            </div>
+            <div class="settings-row">
+                <span>Body CSV</span>
+                <button
+                    class="add-btn-inline"
+                    onclick={() => handleBodyFileOutput()}
+                >
+                    Export CSV
                 </button>
             </div>
         </div>
@@ -621,7 +702,7 @@
             Imported <strong>{phase.result.sets_imported} sets</strong> across
             <strong>{phase.result.workouts_touched} workouts</strong>.
         </div>
-        <button class="add-btn" onclick={reset}>Import another</button>
+        <button class="add-btn" onclick={reset}>Ok</button>
     {:else if phase.name === "error"}
         <div
             class="import-summary"
@@ -721,6 +802,11 @@
             across
             <strong>{phase.result.days_touched} days</strong>.
         </div>
-        <button class="add-btn" onclick={reset}>Import another</button>
+        <button class="add-btn" onclick={reset}>Ok</button>
+    {:else if phase.name === "export_done"}
+        <div class="import-summary">
+            Exported to {phase.path}
+        </div>
+        <button class="add-btn" onclick={reset}>Ok</button>
     {/if}
 </div>

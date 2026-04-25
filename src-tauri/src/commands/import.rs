@@ -2,10 +2,9 @@ use crate::database;
 use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 
-pub fn parse_fitnotes_csv_inner(
+fn get_known_exercises(
     conn: &rusqlite::Connection,
-    csv_text: String,
-) -> Result<ParseResult, String> {
+) -> Result<std::collections::HashMap<String, i64>, String> {
     let mut known: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
     let mut stmt = conn
         .prepare("SELECT id, name FROM exercises")
@@ -19,52 +18,104 @@ pub fn parse_fitnotes_csv_inner(
         let (id, name) = r.map_err(|e| e.to_string())?;
         known.insert(name, id);
     }
+    Ok(known)
+}
 
+fn parse_fitnotes_row(
+    cols: &str,
+    known: &std::collections::HashMap<String, i64>,
+) -> Option<ExerciseRow> {
+    let cols: Vec<&str> = cols.split(',').collect();
+    if cols.len() < 6 {
+        return None;
+    }
+    let date = cols[0].trim().to_string();
+    let exercise_name = cols[1].trim().to_string();
+    let category_name = cols[2].trim().to_string();
+    let weight_raw: f64 = cols[3].trim().parse().unwrap_or(0.0);
+    let weight_unit = cols[4].trim().to_lowercase();
+    let weight_kg = if weight_unit == "lbs" || weight_unit == "lb" {
+        weight_raw * 0.453592
+    } else {
+        weight_raw
+    };
+    let reps: i64 = cols[5].trim().parse().unwrap_or(0);
+    if reps == 0 || date.is_empty() || exercise_name.is_empty() {
+        return None;
+    }
+
+    let exercise_id = known.get(&exercise_name).copied();
+    Some(ExerciseRow {
+        date,
+        workout_name: "Workout".to_string(),
+        exercise_name,
+        category_name,
+        weight_kg,
+        reps,
+        exercise_id,
+    })
+}
+
+fn parse_fitness_notes_row(
+    cols: &str,
+    known: &std::collections::HashMap<String, i64>,
+) -> Option<ExerciseRow> {
+    let cols: Vec<&str> = cols.split(',').collect();
+    if cols.len() < 6 {
+        return None;
+    }
+    let date = cols[0].trim().to_string();
+    let workout_name = cols[1].trim().to_string();
+    let exercise_name = cols[2].trim().to_string();
+    let category_name = cols[3].trim().to_string();
+    let weight_kg: f64 = cols[4].trim().parse().unwrap_or(0.0);
+    let reps: i64 = cols[5].trim().parse().unwrap_or(0);
+
+    let exercise_id = known.get(&exercise_name).copied();
+    Some(ExerciseRow {
+        date,
+        workout_name,
+        exercise_name,
+        category_name,
+        weight_kg,
+        reps,
+        exercise_id,
+    })
+}
+
+pub fn parse_exercise_csv_inner(
+    conn: &rusqlite::Connection,
+    csv_text: String,
+    kind: ImportKind,
+) -> Result<ParseResult, String> {
     let mut parsed: Vec<ExerciseRow> = Vec::new();
     let mut unknowns_seen: std::collections::HashSet<String> = std::collections::HashSet::new();
     let mut unknown_exercises: Vec<UnknownExercise> = Vec::new();
+    let known = get_known_exercises(conn)?;
 
     for (i, line) in csv_text.lines().enumerate() {
         if i == 0 {
             continue;
         }
-        let cols: Vec<&str> = line.split(',').collect();
-        if cols.len() < 6 {
-            continue;
-        }
-        let date = cols[0].trim().to_string();
-        let exercise_name = cols[1].trim().to_string();
-        let category_name = cols[2].trim().to_string();
-        let weight_raw: f64 = cols[3].trim().parse().unwrap_or(0.0);
-        let weight_unit = cols[4].trim().to_lowercase();
-        let weight_kg = if weight_unit == "lbs" || weight_unit == "lb" {
-            weight_raw * 0.453592
-        } else {
-            weight_raw
+        let row = match kind {
+            ImportKind::FitNotes => parse_fitnotes_row(line, &known),
+            ImportKind::FitnessNotes => parse_fitness_notes_row(line, &known),
         };
-        let reps: i64 = cols[5].trim().parse().unwrap_or(0);
-        if reps == 0 {
-            continue; // skip cardio/empty rows
-        }
-        if date.is_empty() || exercise_name.is_empty() {
-            continue;
-        }
 
-        let exercise_id = known.get(&exercise_name).copied();
-        if exercise_id.is_none() && unknowns_seen.insert(exercise_name.clone()) {
-            unknown_exercises.push(UnknownExercise {
-                csv_name: exercise_name.clone(),
-                csv_category: category_name.clone(),
-            });
+        match row {
+            Some(row) => {
+                if row.exercise_id.is_none() && unknowns_seen.insert(row.exercise_name.clone()) {
+                    unknown_exercises.push(UnknownExercise {
+                        csv_name: row.exercise_name.clone(),
+                        csv_category: row.category_name.clone(),
+                    });
+                }
+                parsed.push(row);
+            }
+            None => {
+                continue;
+            }
         }
-        parsed.push(ExerciseRow {
-            date,
-            exercise_name,
-            category_name,
-            weight_kg,
-            reps,
-            exercise_id,
-        });
     }
 
     Ok(ParseResult {
@@ -74,17 +125,84 @@ pub fn parse_fitnotes_csv_inner(
 }
 
 #[tauri::command]
-pub fn parse_fitnotes_csv(
+pub fn parse_exercise_csv(
     csv_text: String,
+    kind: ImportKind,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<ParseResult, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-    parse_fitnotes_csv_inner(&conn, csv_text)
+    parse_exercise_csv_inner(&conn, csv_text, kind)
+}
+
+fn parse_fitness_notes_body_row(
+    line: &str,
+    known: &std::collections::HashMap<String, i64>,
+) -> Option<BodyRow> {
+    let cols: Vec<&str> = line.split(',').collect();
+    if cols.len() < 4 {
+        return None;
+    }
+    let date = cols[0].trim().to_string();
+    let measurement = cols[1].trim().to_string();
+    let value: f64 = match cols[2].trim().parse() {
+        Ok(v) => v,
+        Err(_) => return None,
+    };
+    let unit = cols[3].trim().to_string();
+
+    if date.is_empty() || measurement.is_empty() {
+        return None;
+    }
+
+    let metric_id = known.get(&measurement).copied();
+    Some(BodyRow {
+        date,
+        measurement,
+        value,
+        unit,
+        metric_id,
+    })
+}
+
+fn parse_fitnotes_body_row(
+    line: &str,
+    known: &std::collections::HashMap<String, i64>,
+) -> Option<BodyRow> {
+    let cols: Vec<&str> = line.split(',').collect();
+    if cols.len() < 5 {
+        return None;
+    }
+    let date = cols[0].trim().to_string();
+    let measurement = cols[2].trim().to_string();
+    let value_raw: f64 = match cols[3].trim().parse() {
+        Ok(v) => v,
+        Err(_) => return None,
+    };
+    let unit = cols[4].trim().to_string();
+
+    let value = if unit == "lbs" || unit == "lb" {
+        value_raw * 0.453592
+    } else {
+        value_raw
+    };
+    if date.is_empty() || measurement.is_empty() {
+        return None;
+    }
+
+    let metric_id = known.get(&measurement).copied();
+    Some(BodyRow {
+        date,
+        measurement,
+        value,
+        unit,
+        metric_id,
+    })
 }
 
 pub fn parse_body_measurements_csv_inner(
     conn: &rusqlite::Connection,
     csv: String,
+    kind: ImportKind,
 ) -> Result<ParseBodyResult, String> {
     let mut known: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
     let mut stmt = conn
@@ -108,39 +226,21 @@ pub fn parse_body_measurements_csv_inner(
         if i == 0 {
             continue;
         }
-        let cols: Vec<&str> = line.split(',').collect();
-        if cols.len() < 5 {
+        let row = match kind {
+            ImportKind::FitNotes => parse_fitnotes_body_row(line, &known),
+            ImportKind::FitnessNotes => parse_fitness_notes_body_row(line, &known),
+        };
+        if row.is_none() {
             continue;
         }
-        let date = cols[0].trim().to_string();
-        let measurement = cols[2].trim().to_string();
-        let value_raw: f64 = match cols[3].trim().parse() {
-            Ok(v) => v,
-            Err(_) => continue,
-        };
-        let unit = cols[4].trim().to_string();
+        let row = row.unwrap();
+        parsed.push(row.clone());
 
-        let value = if unit == "lbs" || unit == "lb" {
-            value_raw * 0.453592
-        } else {
-            value_raw
-        };
-        if date.is_empty() || measurement.is_empty() {
-            continue;
+        if row.metric_id.is_none() && unknowns_seen.insert(row.measurement.clone()) {
+            unknown_metrics.push(row.measurement.clone());
         }
-
-        let metric_id = known.get(&measurement).copied();
-        if metric_id.is_none() && unknowns_seen.insert(measurement.clone()) {
-            unknown_metrics.push(measurement.clone());
-        }
-        parsed.push(BodyRow {
-            date,
-            measurement,
-            value,
-            unit,
-            metric_id,
-        });
     }
+    dbg!(parsed.len());
 
     Ok(ParseBodyResult {
         rows: parsed,
@@ -151,13 +251,14 @@ pub fn parse_body_measurements_csv_inner(
 #[tauri::command]
 pub fn parse_body_measurements_csv(
     csv: String,
+    kind: ImportKind,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<ParseBodyResult, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-    parse_body_measurements_csv_inner(&conn, csv)
+    parse_body_measurements_csv_inner(&conn, csv, kind)
 }
 
-pub fn import_fitnotes_rows_inner(
+pub fn import_exercise_rows_inner(
     conn: &rusqlite::Connection,
     rows: Vec<ExerciseRow>,
 ) -> Result<ImportResult, String> {
@@ -168,6 +269,8 @@ pub fn import_fitnotes_rows_inner(
         std::collections::HashMap::new();
     let mut workout_exercise_to_id: std::collections::HashMap<(i64, i64), i64> =
         std::collections::HashMap::new();
+    let mut last_wid: Option<i64> = None;
+    let mut last_eid: Option<i64> = None;
     let mut affected_exercises: std::collections::HashSet<i64> = std::collections::HashSet::new();
     let mut workouts_touched: std::collections::HashSet<i64> = std::collections::HashSet::new();
     let mut sets_imported: i64 = 0;
@@ -213,8 +316,8 @@ pub fn import_fitnotes_rows_inner(
         } else {
             let wid = conn
                 .query_row(
-                    "SELECT id FROM workouts WHERE date = ?1 AND workout_order = 1",
-                    rusqlite::params![row.date],
+                    "SELECT id FROM workouts WHERE date = ?1 AND name = ?2",
+                    rusqlite::params![row.date, row.workout_name],
                     |r| r.get::<_, i64>(0),
                 )
                 .optional()
@@ -224,8 +327,9 @@ pub fn import_fitnotes_rows_inner(
                 Some(wid) => wid,
                 None => {
                     conn.execute(
-                        "INSERT INTO workouts (date, workout_order) VALUES (?1, 1)",
-                        rusqlite::params![row.date],
+                        "INSERT INTO workouts (date, name, workout_order)
+                        VALUES (?1, ?2, (SELECT COALESCE(MAX(workout_order), 0) + 1 FROM workouts WHERE date = ?1))",
+                        rusqlite::params![row.date, row.workout_name],
                     )
                     .map_err(|e| e.to_string())?;
                     conn.last_insert_rowid()
@@ -237,9 +341,20 @@ pub fn import_fitnotes_rows_inner(
         };
 
         // 3. Find or create workout_exercises entry
+        let different_we = match last_wid {
+            Some(last_wid) => match last_eid {
+                Some(last_eid) => workout_id != last_wid || exercise_id != last_eid,
+                None => workout_id != last_wid,
+            },
+            None => true,
+        };
+        last_wid = Some(workout_id);
+        last_eid = Some(exercise_id);
+
         let key = (workout_id, exercise_id);
-        let workout_exercise_id = if let Some(id) = workout_exercise_to_id.get(&key) {
-            *id
+        let id = workout_exercise_to_id.get(&key);
+        let workout_exercise_id = if id.is_some() && !different_we {
+            *id.unwrap()
         } else {
             let next_ex_order: i64 = conn
                 .query_row(
@@ -290,12 +405,12 @@ pub fn import_fitnotes_rows_inner(
 }
 
 #[tauri::command]
-pub fn import_fitnotes_rows(
+pub fn import_exercise_rows(
     rows: Vec<ExerciseRow>,
     db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
 ) -> Result<ImportResult, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-    import_fitnotes_rows_inner(&conn, rows)
+    import_exercise_rows_inner(&conn, rows)
 }
 
 pub fn import_body_measurement_rows_inner(
@@ -386,9 +501,100 @@ pub fn import_body_measurement_rows(
     import_body_measurement_rows_inner(&conn, rows)
 }
 
+pub fn export_exercise_inner(conn: &rusqlite::Connection) -> Result<String, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT w.date, w.name, e.name, c.name, s.weight_kg, s.reps
+                FROM sets s
+                JOIN workout_exercises we ON s.workout_exercise_id = we.id
+                JOIN workouts w ON we.workout_id = w.id
+                JOIN exercises e ON we.exercise_id = e.id
+                JOIN categories c ON e.category_id = c.id
+                ORDER BY w.date, w.workout_order, we.exercise_order, s.set_order",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows_iter = stmt
+        .query_map([], |row| {
+            Ok(ExerciseRow {
+                date: row.get::<_, String>(0)?,
+                workout_name: row.get::<_, String>(1)?,
+                exercise_name: row.get::<_, String>(2)?,
+                category_name: row.get::<_, String>(3)?,
+                weight_kg: row.get::<_, f64>(4)?,
+                reps: row.get::<_, i64>(5)?,
+                exercise_id: None,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut out = "date,workout_name,exercise_name,category_name,weight_kg,reps\n".to_string();
+
+    for r in rows_iter {
+        let r = r.map_err(|e| e.to_string())?;
+        out.push_str(&format!(
+            "{},{},{},{},{},{}\n",
+            r.date, r.workout_name, r.exercise_name, r.category_name, r.weight_kg, r.reps
+        ));
+    }
+
+    Ok(out)
+}
+
+#[tauri::command]
+pub fn export_exercise(
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<String, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    export_exercise_inner(&conn)
+}
+
+pub fn export_body_inner(conn: &rusqlite::Connection) -> Result<String, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT b.date, bm.name, b.value, bm.unit
+             FROM body_measurements b
+             JOIN body_metrics bm ON b.measure_id = bm.id
+             ORDER BY b.date, bm.name",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows_iter = stmt
+        .query_map([], |row| {
+            Ok(BodyRow {
+                date: row.get::<_, String>(0)?,
+                measurement: row.get::<_, String>(1)?,
+                value: row.get::<_, f64>(2)?,
+                unit: row.get::<_, String>(3)?,
+                metric_id: None,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut out = "date,measurement,value,unit\n".to_string();
+    dbg!("Found {} body measurements", rows_iter.size_hint().0);
+
+    for r in rows_iter {
+        let r = r.map_err(|e| e.to_string())?;
+        out.push_str(&format!(
+            "{},{},{},{}\n",
+            r.date, r.measurement, r.value, r.unit
+        ));
+    }
+
+    Ok(out)
+}
+
+#[tauri::command]
+pub fn export_body(
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<String, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    export_body_inner(&conn)
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct ExerciseRow {
     date: String,
+    workout_name: String,
     exercise_name: String,
     category_name: String,
     weight_kg: f64,
@@ -414,7 +620,7 @@ pub struct ImportResult {
     workouts_touched: i64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct BodyRow {
     date: String,
     measurement: String,
@@ -433,4 +639,10 @@ pub struct ParseBodyResult {
 pub struct BodyImportResult {
     measurements_imported: i64,
     days_touched: i64,
+}
+
+#[derive(Deserialize)]
+pub enum ImportKind {
+    FitNotes,
+    FitnessNotes,
 }

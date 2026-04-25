@@ -1,4 +1,4 @@
-const SCHEMA_VERSION: u32 = 7;
+const SCHEMA_VERSION: u32 = 8;
 
 pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), String> {
     let current = conn
@@ -48,6 +48,12 @@ pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), String> {
     if current < 7 && 7 <= SCHEMA_VERSION {
         migrate_7(conn).map_err(|e| e.to_string())?;
         conn.execute_batch("PRAGMA user_version = 7")
+            .map_err(|e| e.to_string())?;
+    }
+
+    if current < 8 && 8 <= SCHEMA_VERSION {
+        migrate_8(conn).map_err(|e| e.to_string())?;
+        conn.execute_batch("PRAGMA user_version = 8")
             .map_err(|e| e.to_string())?;
     }
 
@@ -396,6 +402,31 @@ fn migrate_7(conn: &rusqlite::Connection) -> Result<(), String> {
         "
             BEGIN;
             ALTER TABLE workouts ADD COLUMN name TEXT;
+            COMMIT;",
+    )
+    .map_err(|e| e.to_string())?;
+    conn.execute_batch("PRAGMA foreign_keys = ON;")
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+fn migrate_8(conn: &rusqlite::Connection) -> Result<(), String> {
+    conn.execute_batch("PRAGMA foreign_keys = OFF;")
+        .map_err(|e| e.to_string())?;
+    conn.execute_batch(
+        "
+            BEGIN;
+            UPDATE workouts SET name = 'Workout' WHERE name IS NULL;
+            CREATE TABLE workouts_new (
+                id integer primary key,
+                date text not null,
+                workout_order integer not null default 1,
+                name text not null default 'Workout'
+            );
+            INSERT INTO workouts_new SELECT id, date, workout_order, name FROM workouts;
+            DROP TABLE workouts;
+            ALTER TABLE workouts_new RENAME TO workouts;
             COMMIT;",
     )
     .map_err(|e| e.to_string())?;

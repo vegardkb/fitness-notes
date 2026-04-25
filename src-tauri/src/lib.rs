@@ -10,8 +10,8 @@ use crate::commands::exercises::{
     merge_category_into_existing, merge_exercise_into_existing, rename_category, rename_exercise,
 };
 use crate::commands::import::{
-    import_body_measurement_rows, import_fitnotes_rows, parse_body_measurements_csv,
-    parse_fitnotes_csv,
+    export_body, export_exercise, import_body_measurement_rows, import_exercise_rows,
+    parse_body_measurements_csv, parse_exercise_csv,
 };
 use crate::commands::sets::{delete_set, reorder_exercises, reorder_sets, upsert_set};
 use crate::commands::settings::{
@@ -39,6 +39,8 @@ mod tests;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             initialize_db(app)?;
@@ -89,15 +91,17 @@ pub fn run() {
             merge_category_into_existing,
             reorder_exercises,
             reorder_sets,
-            parse_fitnotes_csv,
+            parse_exercise_csv,
             parse_body_measurements_csv,
-            import_fitnotes_rows,
+            import_exercise_rows,
             import_body_measurement_rows,
             set_dark_mode,
             set_sex,
             set_height,
             save_workout_as_template,
             apply_template,
+            export_body,
+            export_exercise,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
