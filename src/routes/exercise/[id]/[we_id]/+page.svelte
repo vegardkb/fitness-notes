@@ -20,7 +20,7 @@
     let repsInput: number = $state(NaN);
     let adding = $state(false);
     let set_selected = $state<Set | null>(null);
-    let lastSet: SetMinimal | null = $state(null);
+    let lastSet: SetMinimal = $state({ weight: 0, reps: 0 });
 
     function defaultToLastSet() {
         if (lastSet) {
@@ -70,7 +70,6 @@
     });
 
     async function addSet() {
-        if (!weightInput || !repsInput) return;
         adding = true;
         try {
             await invoke<Set>("upsert_set", {
@@ -159,7 +158,15 @@
                             (weightInput = Math.max(weightInput - 2.5, 0))}
                         ><SquareMinus size={20} strokeWidth={1.5} /></button
                     >
-                    <input type="number" bind:value={weightInput} />
+                    <input
+                        type="number"
+                        bind:value={weightInput}
+                        onfocus={(e) =>
+                            setTimeout(
+                                () => (e.target as HTMLInputElement).select(),
+                                0,
+                            )}
+                    />
                     <button
                         class="body-btn"
                         onclick={() => (weightInput += 2.5)}
@@ -175,7 +182,15 @@
                         onclick={() => (repsInput = Math.max(repsInput - 1, 0))}
                         ><SquareMinus size={20} strokeWidth={1.5} /></button
                     >
-                    <input type="number" bind:value={repsInput} />
+                    <input
+                        type="number"
+                        bind:value={repsInput}
+                        onfocus={(e) =>
+                            setTimeout(
+                                () => (e.target as HTMLInputElement).select(),
+                                0,
+                            )}
+                    />
                     <button class="body-btn" onclick={() => (repsInput += 1)}
                         ><SquarePlus size={20} strokeWidth={1.5} /></button
                     >
@@ -183,20 +198,12 @@
             </div>
         </div>
         {#if set_selected}
-            <button
-                class="update-btn"
-                onclick={addSet}
-                disabled={adding || !weightInput || !repsInput}
-            >
+            <button class="update-btn" onclick={addSet} disabled={adding}>
                 {adding ? "Updating…" : "Update set"}
             </button>
             <button class="delete-btn" onclick={deleteSet}>Delete</button>
         {:else}
-            <button
-                class="add-btn"
-                onclick={addSet}
-                disabled={adding || !weightInput || !repsInput}
-            >
+            <button class="add-btn" onclick={addSet} disabled={adding}>
                 {adding ? "Adding…" : "Add set"}
             </button>
         {/if}

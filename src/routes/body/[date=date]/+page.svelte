@@ -143,6 +143,14 @@
                                 <span class="stat-val">
                                     <input
                                         type="number"
+                                        onfocus={(e) =>
+                                            setTimeout(
+                                                () =>
+                                                    (
+                                                        e.target as HTMLInputElement
+                                                    ).select(),
+                                                0,
+                                            )}
                                         bind:value={row.value}
                                         onblur={() => save(row)}
                                     /></span

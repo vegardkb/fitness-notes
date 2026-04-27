@@ -445,7 +445,7 @@ pub fn recompute_pr_flags(conn: &rusqlite::Connection, exercise_id: i64) -> Resu
             "SELECT s.id, s.weight_kg, s.reps FROM sets s
              JOIN workout_exercises we ON s.workout_exercise_id = we.id
              JOIN workouts w ON we.workout_id = w.id
-             WHERE s.exercise_id = ?1
+             WHERE s.exercise_id = ?1 AND s.reps > 0
              ORDER BY w.date ASC, we.exercise_order ASC, s.set_order ASC",
         )
         .map_err(|e| e.to_string())?;
@@ -493,7 +493,7 @@ pub fn recompute_pr_flags(conn: &rusqlite::Connection, exercise_id: i64) -> Resu
                     )
                )
          )
-         WHERE exercise_id = ?1",
+         WHERE exercise_id = ?1 AND reps > 0",
         rusqlite::params![exercise_id],
     )
     .map_err(|e| e.to_string())?;
