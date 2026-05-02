@@ -410,34 +410,46 @@ fn migrate_8(conn: &rusqlite::Connection) -> Result<(), String> {
 // was_pr_at_time: full chronological pass (Pareto frontier of prior sets).
 // is_current_pr: SQL update checking global dominance.
 pub fn recompute_pr_flags(conn: &rusqlite::Connection, exercise_id: i64) -> Result<(), String> {
-    let mut stmt = conn
-        .prepare(
-            "SELECT s.id, s.weight_kg, s.reps FROM sets s
-             JOIN workout_exercises we ON s.workout_exercise_id = we.id
-             JOIN workouts w ON we.workout_id = w.id
-             WHERE s.exercise_id = ?1 AND s.reps > 0
-             ORDER BY w.date ASC, we.exercise_order ASC, s.set_order ASC",
+    // A set was a pr at the time if no previous set was as good or better in at least one dimension
+    conn.execute(
+        "UPDATE sets SET was_pr_at_time = NOT EXISTS (
+            SELECT 1 from sets s2
+            JOIN workout_exercises we2 ON s2.workout_exercise_id = we2.id
+            JOIN workouts w2 ON we2.workout_id = w2.id
+            JOIN workout_exercises we1 ON sets.workout_exercise_id = we1.id
+            JOIN workouts w1 ON we1.workout_id = w1.id
+            WHERE s2.exercise_id = sets.exercise_id
+                AND s2.id != sets.id
+                AND s2.weight_kg >= sets.weight_kg
+                AND s2.reps >= sets.reps
+                AND (
+                    -- Earlier date
+                    w2.date < w1.date
+                    OR (
+                        w2.date == w1.date
+                        AND (
+                            -- Same date, earlier workout
+                            w2.workout_order < w1.workout_order
+                            OR (
+                                w2.workout_order == w1.workout_order
+                                AND (
+                                    -- Same date, same workout, earlier exercise
+                                    we2.exercise_order < we1.exercise_order
+                                    OR (
+                                        -- Same date, same workout, same exercise, earlier set
+                                        we2.exercise_order == we1.exercise_order
+                                        AND s2.set_order < sets.set_order
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
         )
-        .map_err(|e| e.to_string())?;
-
-    let rows: Vec<(i64, f64, i64)> = stmt
-        .query_map(rusqlite::params![exercise_id], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
-
-    let mut seen: Vec<(f64, i64)> = Vec::new();
-    for (id, weight, reps) in &rows {
-        let was_pr = !seen.iter().any(|(w, r)| w >= weight && r >= reps);
-        conn.execute(
-            "UPDATE sets SET was_pr_at_time = ?1 WHERE id = ?2",
-            rusqlite::params![was_pr, id],
-        )
-        .map_err(|e| e.to_string())?;
-        seen.push((*weight, *reps));
-    }
+        where exercise_id = ?1 AND reps > 0",
+        [exercise_id],
+    )
+    .map_err(|e| e.to_string())?;
 
     // A set is a current PR if no other set is strictly better in at least one dimension
     // (or equal in both but logged earlier). This ensures that among identical sets,

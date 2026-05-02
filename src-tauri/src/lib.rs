@@ -23,8 +23,7 @@ use crate::commands::templates::{
 use crate::commands::workouts::{
     add_exercise_to_workout, get_active_dates, get_sets_for_workout_exercise,
     get_workout_exercise_context, get_workout_for_date, get_workout_id_for_date,
-    get_workout_name_for_date, get_workouts_for_range, merge_workout_exercises,
-    remove_exercise_from_workout,
+    get_workout_name_for_date, merge_workout_exercises, remove_exercise_from_workout,
 };
 
 use tauri::Manager;
@@ -64,7 +63,6 @@ pub fn run() {
             get_measurement_history,
             get_measurements_graph_data,
             get_body_min_maxes,
-            get_workouts_for_range,
             get_settings,
             get_last_workout_exercise,
             add_exercise_to_workout,

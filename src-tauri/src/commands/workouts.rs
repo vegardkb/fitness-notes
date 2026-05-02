@@ -1,4 +1,4 @@
-use crate::models::{DayWorkout, ExerciseWithSets, NamedId, Set, WorkoutExerciseContext};
+use crate::models::{ExerciseWithSets, NamedId, Set, WorkoutExerciseContext};
 use rusqlite::OptionalExtension;
 
 pub fn get_workout_for_date_inner(
@@ -7,74 +7,94 @@ pub fn get_workout_for_date_inner(
 ) -> Result<Vec<ExerciseWithSets>, String> {
     let mut stmt = conn
         .prepare(
-            "select e.id, e.name, c.name, we.id, we.exercise_order
+            "SELECT e.id, e.name, c.name, we.id, we.exercise_order, s.id, s.set_order, s.weight_kg, s.reps, s.notes, s.was_pr_at_time, s.is_current_pr
         FROM workouts w
         JOIN workout_exercises we ON we.workout_id = w.id
         JOIN exercises e ON we.exercise_id = e.id
         JOIN categories c ON e.category_id = c.id
+        LEFT JOIN sets s ON s.workout_exercise_id = we.id
         WHERE w.date = ?1
-        ORDER BY we.exercise_order",
+        ORDER BY we.exercise_order, s.set_order",
         )
         .map_err(|e| e.to_string())?;
 
     let rows = stmt
         .query_map(rusqlite::params![date], |row| {
             Ok((
-                row.get::<_, i64>(0)?,    // exercise_id
-                row.get::<_, String>(1)?, // exercise_name
-                row.get::<_, String>(2)?, // category
-                row.get::<_, i64>(3)?,    // workout_exercise_id
-                row.get::<_, i64>(4)?,    // exercise_order
+                row.get::<_, i64>(0)?,            // exercise_id
+                row.get::<_, String>(1)?,         // exercise_name
+                row.get::<_, String>(2)?,         // category
+                row.get::<_, i64>(3)?,            // workout_exercise_id
+                row.get::<_, i64>(4)?,            // exercise_order
+                row.get::<_, Option<i64>>(5)?,    // set_id
+                row.get::<_, Option<i64>>(6)?,    // set_order
+                row.get::<_, Option<f64>>(7)?,    // weight_kg
+                row.get::<_, Option<i64>>(8)?,    // reps
+                row.get::<_, Option<String>>(9)?, // notes
+                row.get::<_, Option<bool>>(10)?,  // was_pr_at_time
+                row.get::<_, Option<bool>>(11)?,  // is_current_pr
             ))
         })
         .map_err(|e| e.to_string())?;
 
     let mut result: Vec<ExerciseWithSets> = Vec::new();
     for row in rows {
-        let (exercise_id, exercise_name, category, workout_exercise_id, exercise_order) =
-            row.map_err(|e| e.to_string())?;
-
-        let mut ex_with_sets = ExerciseWithSets {
-            exercise: NamedId {
-                id: exercise_id,
-                name: exercise_name,
-            },
+        let (
+            exercise_id,
+            exercise_name,
             category,
             workout_exercise_id,
             exercise_order,
-            sets: Vec::new(),
+            set_id,
+            set_order,
+            weight_kg,
+            reps,
+            notes,
+            was_pr_at_time,
+            is_current_pr,
+        ) = row.map_err(|e| e.to_string())?;
+
+        let exercise = match result.last_mut() {
+            Some(e) if e.workout_exercise_id == workout_exercise_id => e,
+            _ => {
+                result.push(ExerciseWithSets {
+                    exercise: NamedId {
+                        id: exercise_id,
+                        name: exercise_name,
+                    },
+                    category,
+                    workout_exercise_id,
+                    exercise_order,
+                    sets: Vec::new(),
+                });
+                result.last_mut().unwrap()
+            }
         };
 
-        let mut stmt = conn
-            .prepare(
-                "SELECT s.id, s.set_order, s.weight_kg, s.reps, s.notes, s.was_pr_at_time, s.is_current_pr
-                 FROM sets s
-                 WHERE s.workout_exercise_id = ?1
-                 ORDER BY s.set_order",
-            )
-            .map_err(|e| e.to_string())?;
-
-        let rows = stmt
-            .query_map(rusqlite::params![workout_exercise_id], |row| {
-                Ok(Set {
-                    id: row.get::<_, i64>(0)?,               // set id
-                    set_order: row.get::<_, i64>(1)?,        // set_order
-                    weight_kg: row.get::<_, f64>(2)?,        // weight_kg
-                    reps: row.get::<_, i64>(3)?,             // reps
-                    notes: row.get::<_, Option<String>>(4)?, // notes
-                    was_pr_at_time: row.get::<_, bool>(5)?,  // was_pr_at_time
-                    is_current_pr: row.get::<_, bool>(6)?,   // is_current_pr
-                })
-            })
-            .map_err(|e| e.to_string())?;
-
-        for row in rows {
-            ex_with_sets.sets.push(row.map_err(|e| e.to_string())?);
+        if let Some(set_id) = set_id {
+            let set = Set {
+                id: set_id,
+                set_order: set_order.unwrap_or_default(),
+                weight_kg: weight_kg.unwrap_or_default(),
+                reps: reps.unwrap_or_default(),
+                notes,
+                was_pr_at_time: was_pr_at_time.unwrap_or_default(),
+                is_current_pr: is_current_pr.unwrap_or_default(),
+            };
+            exercise.sets.push(set);
         }
-        result.push(ex_with_sets);
     }
 
     Ok(result)
+}
+
+#[tauri::command]
+pub fn get_workout_for_date(
+    date: &str,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<Vec<ExerciseWithSets>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    get_workout_for_date_inner(&conn, date)
 }
 
 #[tauri::command]
@@ -160,121 +180,6 @@ pub fn get_workout_name_for_date_inner(
         .optional()
         .map_err(|e| e.to_string())?;
     Ok(row)
-}
-
-#[tauri::command]
-pub fn get_workout_for_date(
-    date: &str,
-    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<Vec<ExerciseWithSets>, String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
-    get_workout_for_date_inner(&conn, date)
-}
-
-pub fn get_workouts_for_range_inner(
-    conn: &rusqlite::Connection,
-    from_date: &str,
-    to_date: &str,
-) -> Result<Vec<DayWorkout>, String> {
-    let mut stmt = conn
-        .prepare(
-            "SELECT w.date, e.id, e.name, c.name, we.exercise_order, we.id,
-                    s.id, s.set_order, s.weight_kg, s.reps, s.notes, s.was_pr_at_time, s.is_current_pr
-             FROM workouts w
-             JOIN workout_exercises we ON we.workout_id = w.id
-             JOIN exercises e ON we.exercise_id = e.id
-             JOIN categories c ON e.category_id = c.id
-             JOIN sets s ON s.workout_exercise_id = we.id
-             WHERE w.date BETWEEN ?1 AND ?2
-             ORDER BY w.date DESC, we.exercise_order, s.set_order",
-        )
-        .map_err(|e| e.to_string())?;
-
-    let rows = stmt
-        .query_map(rusqlite::params![from_date, to_date], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, i64>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, i64>(4)?,
-                row.get::<_, i64>(5)?,
-                row.get::<_, i64>(6)?,
-                row.get::<_, i64>(7)?,
-                row.get::<_, f64>(8)?,
-                row.get::<_, i64>(9)?,
-                row.get::<_, Option<String>>(10)?,
-                row.get::<_, bool>(11)?,
-                row.get::<_, bool>(12)?,
-            ))
-        })
-        .map_err(|e| e.to_string())?;
-
-    let mut result: Vec<DayWorkout> = Vec::new();
-    for row in rows {
-        let (
-            date,
-            exercise_id,
-            exercise_name,
-            category,
-            exercise_order,
-            workout_exercise_id,
-            set_id,
-            set_order,
-            weight_kg,
-            reps,
-            notes,
-            was_pr_at_time,
-            is_current_pr,
-        ) = row.map_err(|e| e.to_string())?;
-
-        let set = Set {
-            id: set_id,
-            set_order,
-            weight_kg,
-            reps,
-            notes,
-            was_pr_at_time,
-            is_current_pr,
-        };
-
-        let day = match result.last_mut() {
-            Some(d) if d.date == date => d,
-            _ => {
-                result.push(DayWorkout {
-                    date: date.clone(),
-                    exercises: Vec::new(),
-                });
-                result.last_mut().unwrap()
-            }
-        };
-
-        match day.exercises.last_mut() {
-            Some(ex) if ex.exercise.id == exercise_id => ex.sets.push(set),
-            _ => day.exercises.push(ExerciseWithSets {
-                exercise: NamedId {
-                    id: exercise_id,
-                    name: exercise_name,
-                },
-                category,
-                workout_exercise_id,
-                exercise_order,
-                sets: vec![set],
-            }),
-        }
-    }
-
-    Ok(result)
-}
-
-#[tauri::command]
-pub fn get_workouts_for_range(
-    from_date: &str,
-    to_date: &str,
-    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
-) -> Result<Vec<DayWorkout>, String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
-    get_workouts_for_range_inner(&conn, from_date, to_date)
 }
 
 pub fn get_active_dates_inner(

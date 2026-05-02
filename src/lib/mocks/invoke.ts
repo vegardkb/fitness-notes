@@ -536,17 +536,6 @@ function dispatch(cmd: string, a: Record<string, any>): unknown {
       return [];
     }
 
-    case "get_workouts_for_range": {
-      const from: string = a.fromDate ?? a.from_date;
-      const to: string = a.toDate ?? a.to_date;
-      return WORKOUTS.filter((w) => w.date >= from && w.date <= to)
-        .sort((x, y) => y.date.localeCompare(x.date))
-        .map((w) => ({
-          date: w.date,
-          exercises: w.exercises.map(expandExerciseWithSets),
-        }));
-    }
-
     case "get_exercise_history": {
       const exerciseId = a.exerciseId ?? a.exercise_id;
       const days: Array<{ date: string; exercises: any[] }> = [];
