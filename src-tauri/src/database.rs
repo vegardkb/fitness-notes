@@ -9,52 +9,22 @@ pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), String> {
         return Err("DB is newer than this version of the app".into());
     }
 
-    if current < 1 && 1 <= SCHEMA_VERSION {
-        migrate_1(conn).map_err(|e| e.to_string())?;
-        conn.execute_batch("PRAGMA user_version = 1")
-            .map_err(|e| e.to_string())?;
-    }
-
-    if current < 2 && 2 <= SCHEMA_VERSION {
-        migrate_2(conn).map_err(|e| e.to_string())?;
-        conn.execute_batch("PRAGMA user_version = 2")
-            .map_err(|e| e.to_string())?;
-    }
-
-    if current < 3 && 3 <= SCHEMA_VERSION {
-        migrate_3(conn).map_err(|e| e.to_string())?;
-        conn.execute_batch("PRAGMA user_version = 3")
-            .map_err(|e| e.to_string())?;
-    }
-
-    if current < 4 && 4 <= SCHEMA_VERSION {
-        migrate_4(conn).map_err(|e| e.to_string())?;
-        conn.execute_batch("PRAGMA user_version = 4")
-            .map_err(|e| e.to_string())?;
-    }
-
-    if current < 5 && 5 <= SCHEMA_VERSION {
-        migrate_5(conn).map_err(|e| e.to_string())?;
-        conn.execute_batch("PRAGMA user_version = 5")
-            .map_err(|e| e.to_string())?;
-    }
-
-    if current < 6 && 6 <= SCHEMA_VERSION {
-        migrate_6(conn).map_err(|e| e.to_string())?;
-        conn.execute_batch("PRAGMA user_version = 6")
-            .map_err(|e| e.to_string())?;
-    }
-
-    if current < 7 && 7 <= SCHEMA_VERSION {
-        migrate_7(conn).map_err(|e| e.to_string())?;
-        conn.execute_batch("PRAGMA user_version = 7")
-            .map_err(|e| e.to_string())?;
-    }
-
-    if current < 8 && 8 <= SCHEMA_VERSION {
-        migrate_8(conn).map_err(|e| e.to_string())?;
-        conn.execute_batch("PRAGMA user_version = 8")
-            .map_err(|e| e.to_string())?;
+    for version in 1..=SCHEMA_VERSION {
+        if current < version {
+            match version {
+                1 => migrate_1(conn).map_err(|e| e.to_string())?,
+                2 => migrate_2(conn).map_err(|e| e.to_string())?,
+                3 => migrate_3(conn).map_err(|e| e.to_string())?,
+                4 => migrate_4(conn).map_err(|e| e.to_string())?,
+                5 => migrate_5(conn).map_err(|e| e.to_string())?,
+                6 => migrate_6(conn).map_err(|e| e.to_string())?,
+                7 => migrate_7(conn).map_err(|e| e.to_string())?,
+                8 => migrate_8(conn).map_err(|e| e.to_string())?,
+                _ => return Err("Unknown version".into()),
+            }
+            conn.execute_batch(&format!("PRAGMA user_version = {}", version))
+                .map_err(|e| e.to_string())?;
+        }
     }
 
     Ok(())
