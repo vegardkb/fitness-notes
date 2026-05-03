@@ -145,19 +145,20 @@ A season is a 1-year window starting from a user-configured month/day (MM-DD), r
 **DB changes** (migrations v8–v10):
 ```sql
 ALTER TABLE user_settings ADD COLUMN season_start TEXT DEFAULT '01-01';
-ALTER TABLE user_settings ADD COLUMN use_seasons  BOOLEAN DEFAULT true;
 ALTER TABLE sets           ADD COLUMN is_season_pr BOOLEAN DEFAULT false;
+ALTER TABLE sets           ADD COLUMN was_season_pr_at_time BOOLEAN DEFAULT false;
 ```
 
-**Logic**: `is_season_pr` uses the same Pareto-frontier algorithm as `is_current_pr`, but scoped only to sets within the current season window. Recomputed on every set insert/edit/delete via a new `recompute_season_prs(conn, exercise_id)` helper.
+**Logic**: `is_season_pr` uses the same Pareto-frontier algorithm as `is_current_pr`, but scoped only to sets within season windows, so there can be multiple sets per rep count and exercise id pair with is_season_pr true, but only one per season. Additionally, the was_season_pr_at_time is analogous to was_pr_at_time. Recomputed on every set insert/edit/delete via a new `recompute_season_prs(conn, exercise_id)` helper, or add to recmpute_pr_flags. Note that on insert/edit/delete, only the season that the date is in needs to be recomputed. 
 
 **Commands**:
 - `get_season_rep_maxes(exercise_id) → Vec<RepMax>`
 - Update `upsert_set` / `delete_set` to also recompute season PRs
 
 **Frontend**:
-- PRs page (`/exercise/[id]/prs`): add a second column "This season" alongside "All time" for each rep count row. If `use_seasons` is false (settings toggle), hide the season column.
-- Settings page: season start MM-DD input + use_seasons toggle
+- PRs page (`/exercise/[id]/prs`): add a second column "This season" alongside "All time" for each rep count row.
+- Settings page: season start MM-DD input
+- Set rows: Add season pr badges for current and at-time.
 
 ---
 
