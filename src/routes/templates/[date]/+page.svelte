@@ -5,6 +5,7 @@
     import { onMount } from "svelte";
     import SelectList from "$lib/SelectList.svelte";
     import { toast } from "$lib/toast";
+    import { Pencil } from "lucide-svelte";
 
     import type { NamedId } from "$lib/exercise";
 
@@ -57,6 +58,13 @@
             onclick={() => goto(date ? `/?date=${date}` : "/")}>←</button
         >
         <h1>Select template</h1>
+        <a
+            class="header-tab header-tab--active"
+            href={"/templates?date=" + date}
+            aria-label="Edit templates"
+        >
+            <Pencil size={18} strokeWidth={1.5} />
+        </a>
     </div>
     <SelectList
         items={templates}

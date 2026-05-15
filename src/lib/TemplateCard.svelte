@@ -1,62 +1,68 @@
 <script lang="ts">
-    import { goto } from "$app/navigation";
+    import { goto, invalidateAll } from "$app/navigation";
     import { invoke } from "$lib/tauri";
     import { selectionFeedback } from "@tauri-apps/plugin-haptics";
-    import { toast } from "$lib/toast";
 
     import { onMount } from "svelte";
     import { dndzone } from "svelte-dnd-action";
-    import { formatDate } from "$lib/date";
     import {
         GripVertical,
         ChevronRight,
-        PersonStanding,
         Dumbbell,
         X,
-        Trash,
+        Trash2,
         Merge,
-        ClipboardPaste,
-        ClipboardCopy,
         Pencil,
     } from "lucide-svelte";
-    import type { ExerciseWithSets } from "$lib/exercise";
+    import type {
+        ExerciseWithSets,
+        NamedId,
+        TemplateWithExercises,
+    } from "$lib/exercise";
     import { formatWeight } from "$lib/exercise";
 
-    let { date }: { date: string } = $props();
-
-    let workoutTitle = $state("Workout");
+    let props = $props();
+    let nameId: NamedId = props.template;
+    let listTemplates: () => Promise<void> = props.listTemplates;
+    const date = new URLSearchParams(location.search).get("date");
+    let workoutTitle = $state("Template");
     let exercises = $state<ExerciseWithSets[]>([]);
+
+    let confirmingDelete = $state(false);
+    let enteringName = $state(false);
 
     let dragDisabled = $state(true);
 
-    async function loadExercises() {
-        const result = await invoke<ExerciseWithSets[]>(
-            "get_workout_for_date",
-            { date },
-        );
-        exercises = result.map((e) => ({ ...e, id: e.workout_exercise_id }));
-        const name = await invoke<string | null>("get_workout_name_for_date", {
-            date,
+    async function loadTemplate() {
+        const result = await invoke<TemplateWithExercises>("get_template", {
+            id: nameId.id,
         });
-        if (name) {
-            workoutTitle = name;
-        } else if (result.length === 0) {
-            workoutTitle = "Rest";
-        } else {
-            workoutTitle = "Workout";
-        }
+        exercises = result.exercises.map((e) => ({
+            ...e,
+            id: e.workout_exercise_id,
+        }));
+        workoutTitle = result.template.name;
     }
 
-    let enteringName = $state(false);
-    async function renameWorkout() {
-        await invoke("set_workout_name", {
-            date,
+    async function deleteTemplate() {
+        await invoke("delete_template", {
+            templateId: nameId.id,
+        });
+        await listTemplates();
+    }
+
+    async function renameTemplate() {
+        await invoke("rename_template", {
+            id: nameId.id,
             name: workoutTitle,
         });
         enteringName = false;
+        await listTemplates();
     }
 
-    onMount(loadExercises);
+    onMount(async () => {
+        await loadTemplate();
+    });
 
     const handleConsider = (evt) => {
         exercises = evt.detail.items;
@@ -69,7 +75,7 @@
             ),
         });
         dragDisabled = true;
-        loadExercises();
+        loadTemplate();
     };
     const startDrag = () => {
         dragDisabled = false;
@@ -138,14 +144,14 @@
     }
 
     async function deleteSelectedExercises() {
-        for (const we_id of selectedExercises) {
-            await invoke("remove_exercise_from_workout", {
-                workoutExerciseId: we_id,
+        for (const te_id of selectedExercises) {
+            await invoke("remove_exercise_from_template", {
+                templateExerciseId: te_id,
             });
         }
         selectedExercises = [];
         selectMode = false;
-        loadExercises();
+        loadTemplate();
     }
 
     async function mergeSelectedExercises() {
@@ -160,42 +166,19 @@
             return;
         }
 
-        await invoke("merge_workout_exercises", {
-            workoutExerciseIds: selectedExercises,
+        await invoke("merge_template_exercises", {
+            templateExerciseIds: selectedExercises,
         });
         selectedExercises = [];
         selectMode = false;
-        loadExercises();
-    }
-
-    async function saveTemplate() {
-        try {
-            let workoutId = await invoke<number | null>(
-                "get_workout_id_for_date",
-                {
-                    date,
-                },
-            );
-            await invoke("save_workout_as_template", {
-                workoutId,
-                name: workoutTitle,
-            });
-            toast.show("Template saved", "success");
-        } catch (e) {
-            toast.show(String(e), "error");
-        }
-        loadExercises();
+        loadTemplate();
     }
 </script>
 
-<article class="day-card" id="day-{date}">
+<article class="day-card" id="template-{nameId.id}">
     <div class="day-card-header">
-        <span class="day-label">{formatDate(date)}</span>
-        <div class="day-card-btns">
-            <button class="back-btn" onclick={() => goto(`/body/${date}`)}>
-                <PersonStanding size={18} strokeWidth={2} />
-            </button>
-        </div>
+        <span class="day-label"></span>
+        <div class="day-card-btns"></div>
     </div>
 
     <div class="workout-card">
@@ -204,47 +187,56 @@
                 <input
                     class="workout-title-input"
                     bind:value={workoutTitle}
-                    onblur={() => renameWorkout()}
+                    onblur={() => renameTemplate()}
                 />
             {:else}
                 <div style="display: flex; gap: 10px;">
                     <h2 class="workout-title">{workoutTitle}</h2>
-                    {#if workoutTitle !== "Rest"}
-                        <button
-                            class="back-btn"
-                            onclick={() => (enteringName = true)}
-                        >
-                            <Pencil size={18} strokeWidth={1.5} />
-                        </button>
-                    {/if}
+                    <button
+                        class="back-btn"
+                        onclick={() => (enteringName = true)}
+                    >
+                        <Pencil size={18} strokeWidth={1.5} />
+                    </button>
                 </div>
             {/if}
             <div class="workout-card-btns">
-                {#if exercises.length === 0}
-                    <button
-                        class="back-btn"
-                        onclick={() => goto(`/templates/${date}`)}
-                    >
-                        <ClipboardPaste size={18} strokeWidth={1.5} />
-                    </button>
-                {:else}
-                    <button
-                        class="back-btn"
-                        onclick={() => {
-                            saveTemplate();
-                        }}
-                    >
-                        <ClipboardCopy size={18} strokeWidth={1.5} />
-                    </button>
-                {/if}
                 <button
                     class="back-btn"
-                    onclick={() => goto(`/exercises/${date}`)}
+                    onclick={() => (confirmingDelete = true)}
+                >
+                    <Trash2 size={18} strokeWidth={1.5} />
+                </button>
+                <button
+                    class="back-btn"
+                    onclick={() =>
+                        goto(`/exercises/${date}?fromTemplate=${nameId.id}`)}
                 >
                     <Dumbbell size={18} strokeWidth={1.5} />
                 </button>
             </div>
         </div>
+        {#if confirmingDelete}
+            <span style="font-size: 0.9rem;"
+                >Delete template? This cannot be undone.</span
+            >
+            <div style="display: flex; gap: 0.5rem;">
+                <button
+                    class="delete-btn"
+                    style="flex:1;"
+                    onclick={deleteTemplate}
+                >
+                    Delete template
+                </button>
+                <button
+                    class="update-btn"
+                    style="flex:1;"
+                    onclick={() => (confirmingDelete = false)}
+                >
+                    Cancel
+                </button>
+            </div>
+        {/if}
         <div
             class="list"
             use:dndzone={{
@@ -270,7 +262,7 @@
                         selectMode
                             ? selectExercise(ex.workout_exercise_id)
                             : goto(
-                                  `/exercise/${ex.exercise.id}/${ex.workout_exercise_id}`,
+                                  `/exercise/${ex.exercise.id}/${ex.workout_exercise_id}?fromDate=${date}&fromTemplate=${ex.workout_exercise_id}`,
                               )}
                 >
                     <div class="exercise-card-header">

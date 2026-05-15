@@ -10,9 +10,13 @@
     } from "$lib/exercise";
     import { formatWeight } from "$lib/exercise";
     import { SquareMinus, SquarePlus, GripVertical } from "lucide-svelte";
+    import { todayStr } from "$lib/date";
 
     const workoutExerciseId = $derived(Number(page.params.we_id ?? "0"));
     const exerciseId = $derived(Number(page.params.id));
+    const fromTemplate = $derived(
+        page.url.searchParams.get("fromTemplate") ?? "",
+    );
 
     let sets = $state<Set[]>([]);
     let date = $state<string>("");
@@ -42,43 +46,57 @@
     }
 
     async function refreshSets() {
-        const setsData = await invoke<Set[]>("get_sets_for_workout_exercise", {
-            workoutExerciseId: workoutExerciseId,
+        let setsData: Set[];
+        if (fromTemplate) {
+            setsData = await invoke<Set[]>("get_sets_for_template_exercise", {
+                templateExerciseId: parseInt(fromTemplate),
+            });
+            date = todayStr();
+        } else {
+            setsData = await invoke<Set[]>("get_sets_for_workout_exercise", {
+                workoutExerciseId: workoutExerciseId,
+            });
+            const weContext = await invoke<WorkoutExerciseContext>(
+                "get_workout_exercise_context",
+                {
+                    workoutExerciseId: workoutExerciseId,
+                },
+            );
+            date = weContext.date;
+        }
+        const lastSetData = await invoke<SetMinimal | null>("get_last_set", {
+            exerciseId: exerciseId,
         });
+        if (lastSetData) lastSet = lastSetData;
         sets = setsData;
     }
 
     onMount(async () => {
         console.log(date);
-        const setsData = await invoke<Set[]>("get_sets_for_workout_exercise", {
-            workoutExerciseId: workoutExerciseId,
-        });
-        const lastSetData = await invoke<SetMinimal | null>("get_last_set", {
-            exerciseId: exerciseId,
-        });
-        const weContext = await invoke<WorkoutExerciseContext>(
-            "get_workout_exercise_context",
-            {
-                workoutExerciseId: workoutExerciseId,
-            },
-        );
+        refreshSets();
 
-        sets = setsData;
-        if (lastSetData) lastSet = lastSetData;
-        date = weContext.date;
         defaultToLastSet();
     });
 
     async function addSet() {
         adding = true;
         try {
-            await invoke<Set>("upsert_set", {
-                id: set_selected?.id ?? null,
-                workoutExerciseId: workoutExerciseId,
-                weightKg: weightInput,
-                reps: repsInput,
-                notes: null,
-            });
+            if (fromTemplate) {
+                await invoke<Set>("upsert_template_set", {
+                    id: set_selected?.id ?? null,
+                    templateExerciseId: parseInt(fromTemplate),
+                    weightKg: weightInput,
+                    reps: repsInput,
+                });
+            } else {
+                await invoke<Set>("upsert_set", {
+                    id: set_selected?.id ?? null,
+                    workoutExerciseId: workoutExerciseId,
+                    weightKg: weightInput,
+                    reps: repsInput,
+                    notes: null,
+                });
+            }
             set_selected = null;
             lastSet = { weight: weightInput, reps: repsInput };
             await refreshSets();
@@ -90,7 +108,11 @@
 
     async function deleteSet() {
         if (!set_selected) return;
-        await invoke("delete_set", { id: set_selected.id });
+        if (fromTemplate) {
+            await invoke("delete_template_set", { id: set_selected.id });
+        } else {
+            await invoke("delete_set", { id: set_selected.id });
+        }
         set_selected = null;
         await refreshSets();
         defaultToLastSet();
@@ -102,10 +124,16 @@
 
     function handleSetFinalize(e: CustomEvent) {
         sets = e.detail.items;
-        invoke("reorder_sets", {
-            workoutExerciseId,
-            orderedSetIds: sets.map((s) => s.id),
-        }).then(() => refreshSets());
+        if (fromTemplate) {
+            invoke("reorder_template_sets", {
+                orderedSetIds: sets.map((s) => s.id),
+            }).then(() => refreshSets());
+        } else {
+            invoke("reorder_sets", {
+                workoutExerciseId,
+                orderedSetIds: sets.map((s) => s.id),
+            }).then(() => refreshSets());
+        }
     }
 </script>
 

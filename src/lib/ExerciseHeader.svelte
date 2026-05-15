@@ -13,6 +13,7 @@
         props.exerciseName ? props.exerciseName : "Exercise",
     );
     let date = $derived(props.date ? formatDate(props.date) : "");
+    let fromTemplate = $derived(props.fromTemplate ?? "");
 </script>
 
 <div class="history-header">
@@ -21,7 +22,7 @@
     >
     {#if props.activeTab === "sets"}
         <h1>{exerciseName}</h1>
-        <p>{date}</p>
+        <p>{fromTemplate ? "Template" : date}</p>
     {:else if props.activeTab === "history"}
         <h1>{exerciseName}</h1>
         <p>History</p>

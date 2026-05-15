@@ -9,6 +9,7 @@
     import Toaster from "$lib/Toaster.svelte";
     import { invoke } from "$lib/tauri";
     import type { Settings } from "$lib/settings";
+    import { page } from "$app/state";
 
     let { children } = $props();
 
@@ -26,6 +27,8 @@
             });
         });
     });
+    let data = $derived(page.url);
+    $inspect(data.href).with(console.trace);
 </script>
 
 {@render children()}

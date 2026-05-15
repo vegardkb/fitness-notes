@@ -225,6 +225,40 @@ New Rust commands:
 
 ---
 
+### 11. Workout templates management
+
+Currently, the workout planning feature is limited to saving a workout as a template, giving it a name, and pasting it on a day where there is no current workout. This feels a bit limiting, as the user would have to modify actual sets and workouts in order to create a new template workout, and there isn't a simple way to see what templates are saved or to edit existing templates. Therefore, a page for managing templates would be handy.
+
+**Layout**
+I am imagining something very similar to the daycards, except there would just be a single daycard (date = templates). Differences from day-card: 
+- An add button for creating a new template (this should likely also be on the day card for multi-workout support, but that is potential future stuff.)
+- A delete button for deleting a template
+- Remove the body button.
+- Templates sorted alpabetically by name.
+- Rename pencil button by the template name 
+- Remove the copy/paste buttons.
+
+**New commands** 
+- upsert_template_set(id: Option<i64>, template_exercise_id: i64, weight_kg: f64, reps: i64) -> Set
+- delete_template_set(id: i64) -> ()
+- reorder_template_exercises(ordered_template_exercise_ids) -> ()
+- reorder_template_sets(template_exercise_id: i64, ordered_set_ids: Vec<i64>) -> ()
+- add_exercise_to_template(id: i64, exercise_id: i64) -> i64
+- remove_exercise_from_template(template_exercise_id: i64) -> ()
+- get_templates() -> Vec<TemplateWithExercises>
+- merge_template_exercises(template_exercise_ids: Vec<i64>) -> ()
+
+
+**Frontend**
+- Create /templates, essentially a modified DayCard with a simple header (back button), and a title "Edit templates" or "Templates"
+- Wire up link to /templates from settings, the select template page, and the copy to clipboard button.
+- new edit sets route for template sets. For reusing the existing one as much as possible, it can be placed in templates/[id]/[te_id]/
+
+**Notes**
+All of the new commands will be pretty much copy-pasted from their real-workout counterparts, the same goes for the frontend additions. I think I am mostly fine with this duplication, especially considering that the templates feature may diverge from the standard exercise tracking mode more in the future (weight/reps can become percentage/reps, rpe/reps, ... for better planning purposes), and I do not want to prematurely figure out good abstractions, as I don't really see them yet. 
+
+---
+
 ## Implementation order
 
 1. ~~**Migration infrastructure**~~ ✓ done

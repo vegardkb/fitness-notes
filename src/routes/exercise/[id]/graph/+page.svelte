@@ -22,6 +22,9 @@
 
     const exerciseId = $derived(Number(page.params.id ?? "0"));
     const date = $derived(page.url.searchParams.get("from") ?? "");
+    const fromTemplate = $derived(
+        page.url.searchParams.get("fromTemplate") ?? "",
+    );
 
     let exerciseName = $state("");
     let data = $state<DataPoint[]>([]);

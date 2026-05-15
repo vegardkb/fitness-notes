@@ -413,3 +413,26 @@ pub fn merge_workout_exercises(
     let conn = db.lock().map_err(|e| e.to_string())?;
     merge_workout_exercises_inner(&conn, workout_exercise_ids)
 }
+
+#[tauri::command]
+pub fn set_workout_name(
+    date: String,
+    name: String,
+    db: tauri::State<std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    set_workout_name_inner(&conn, date, name)
+}
+
+pub fn set_workout_name_inner(
+    conn: &rusqlite::Connection,
+    date: String,
+    name: String,
+) -> Result<(), String> {
+    conn.execute(
+        "UPDATE workouts SET name = ?1 WHERE date = ?2",
+        rusqlite::params![name, date],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}

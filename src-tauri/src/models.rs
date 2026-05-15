@@ -22,6 +22,12 @@ pub struct DayWorkout {
 }
 
 #[derive(Serialize)]
+pub struct TemplateWithExercises {
+    pub template: NamedId,
+    pub exercises: Vec<ExerciseWithSets>,
+}
+
+#[derive(Serialize)]
 pub struct Set {
     pub id: i64,
     pub set_order: i64,

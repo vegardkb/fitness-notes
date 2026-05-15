@@ -6,6 +6,9 @@
     import { exerciseHrefs } from "$lib/exercise";
 
     let { children } = $props();
+    const fromTemplate = page.url.searchParams.get("fromTemplate") ?? "";
+    const fromDate = page.url.searchParams.get("fromDate") ?? "";
+    $inspect(fromTemplate);
 
     let exerciseId = $derived(Number(page.params.id));
     let workoutExerciseContext: WorkoutExerciseContext = $state({
@@ -41,7 +44,10 @@
         exerciseHrefs(
             exerciseId,
             workoutExerciseId,
-            workoutExerciseContext.date,
+            workoutExerciseContext.date
+                ? workoutExerciseContext.date
+                : fromDate,
+            fromTemplate,
         ),
     );
 
@@ -49,12 +55,18 @@
     let date: string = $derived(workoutExerciseContext.date);
 
     $effect(() => {
-        console.log(workoutExerciseId);
+        if (fromTemplate) {
+            invoke<WorkoutExerciseContext>("get_template_exercise_context", {
+                templateExerciseId: workoutExerciseId,
+            }).then((context) => {
+                workoutExerciseContext = context;
+            });
+            return;
+        }
         invoke<WorkoutExerciseContext>("get_workout_exercise_context", {
             workoutExerciseId,
         }).then((context) => {
             workoutExerciseContext = context;
-            console.log(workoutExerciseContext);
         });
     });
 </script>
@@ -69,6 +81,7 @@
         {exerciseName}
         {activeTab}
         {date}
+        {fromTemplate}
     />
     {@render children()}
 </div>

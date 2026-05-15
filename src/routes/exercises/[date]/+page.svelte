@@ -10,6 +10,9 @@
     import type { NamedId } from "$lib/exercise";
 
     const date = $derived(page.params.date ?? "");
+    const template_id = $derived(
+        page.url.searchParams.get("fromTemplate") ?? "",
+    );
 
     type View =
         | { name: "categories" }
@@ -164,6 +167,17 @@
     }
 
     async function selectExercise(exercise: NamedId) {
+        if (template_id) {
+            let template_id_numeric = parseInt(template_id);
+            await invoke<number>("add_exercise_to_template", {
+                id: template_id_numeric,
+                exerciseId: exercise.id,
+            });
+            goto(`/templates?date=${date}`, {
+                replaceState: true,
+            });
+            return;
+        }
         let workout_exercise_id = await invoke<number>(
             "add_exercise_to_workout",
             {
@@ -174,6 +188,14 @@
         goto(`/exercise/${exercise.id}/${workout_exercise_id}`, {
             replaceState: true,
         });
+    }
+
+    function goBack() {
+        if (template_id) {
+            goto(`/templates?date=${date}`);
+            return;
+        }
+        goto(date ? `/?date=${date}` : "/");
     }
 
     const categoryActions = [
@@ -190,10 +212,7 @@
 <div class="page" role="presentation">
     {#if view.name === "categories"}
         <div class="header">
-            <button
-                class="back-btn"
-                onclick={() => goto(date ? `/?date=${date}` : "/")}>←</button
-            >
+            <button class="back-btn" onclick={() => goBack()}>←</button>
             <h1>Select category</h1>
             <button class="back-btn" onclick={() => (creating = true)}>
                 <PlusIcon />

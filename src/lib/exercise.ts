@@ -33,6 +33,11 @@ export type NamedId = {
   name: string;
 };
 
+export type TemplateWithExercises = {
+  template: NamedId;
+  exercises: ExerciseWithSets[];
+};
+
 export type DayWorkout = {
   date: string;
   exercises: ExerciseWithSets[];
@@ -52,13 +57,28 @@ export function exerciseHrefs(
   exerciseId: number,
   workoutExerciseId: number,
   fromDate: string,
+  fromTemplate: string,
 ) {
   const from = workoutExerciseId ? `?from=${workoutExerciseId}` : "";
+  const template = fromTemplate ? `?fromTemplate=${fromTemplate}` : "";
+  console.log(
+    `exerciseHrefs: exerciseId=${exerciseId} workoutExerciseId=${workoutExerciseId} fromDate=${fromDate} fromTemplate=${fromTemplate}`,
+  );
+  let feedHref;
+  if (fromTemplate) {
+    if (fromDate) {
+      feedHref = `/templates?date=${fromDate}`;
+    } else {
+      feedHref = "/templates";
+    }
+  } else {
+    feedHref = fromDate ? `/?date=${fromDate}` : "/";
+  }
   return {
-    feedHref: fromDate ? `/?date=${fromDate}` : "/",
-    setsHref: `/exercise/${exerciseId}/${workoutExerciseId}`,
-    historyHref: `/exercise/${exerciseId}/history${from}`,
-    graphHref: `/exercise/${exerciseId}/graph${from}`,
-    prsHref: `/exercise/${exerciseId}/prs${from}`,
+    feedHref,
+    setsHref: `/exercise/${exerciseId}/${workoutExerciseId}${template}`,
+    historyHref: `/exercise/${exerciseId}/history${from}${template}`,
+    graphHref: `/exercise/${exerciseId}/graph${from}${template}`,
+    prsHref: `/exercise/${exerciseId}/prs${from}${template}`,
   };
 }
