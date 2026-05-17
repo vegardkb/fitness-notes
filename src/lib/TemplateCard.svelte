@@ -22,9 +22,13 @@
     } from "$lib/exercise";
     import { formatWeight } from "$lib/exercise";
 
-    let props = $props();
-    let nameId: NamedId = props.template;
-    let listTemplates: () => Promise<void> = props.listTemplates;
+    let { template, listTemplates, onLoaded } = $props<{
+        template: NamedId;
+        listTemplates: () => Promise<void>;
+        onLoaded?: (id: number) => void;
+    }>();
+
+    let nameId: NamedId = template;
     const date = new URLSearchParams(location.search).get("date");
     let workoutTitle = $state("Template");
     let exercises = $state<ExerciseWithSets[]>([]);
@@ -63,6 +67,7 @@
 
     onMount(async () => {
         await loadTemplate();
+        onLoaded?.(nameId.id);
     });
 
     const handleConsider = (evt) => {
@@ -263,7 +268,7 @@
                         selectMode
                             ? selectExercise(ex.workout_exercise_id)
                             : goto(
-                                  `/exercise/${ex.exercise.id}/${ex.workout_exercise_id}?fromDate=${date}&fromTemplate=${ex.workout_exercise_id}`,
+                                  `/exercise/${ex.exercise.id}/${ex.workout_exercise_id}?fromDate=${date}&fromTemplate=${nameId.id}`,
                               )}
                 >
                     <div class="exercise-card-header">

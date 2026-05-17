@@ -31,6 +31,13 @@
     let mergeExerciseFrom = $state<NamedId | null>(null);
     let mergeExerciseTo = $state<NamedId | null>(null);
 
+    function createParams() {
+        let params = new URLSearchParams();
+        if (template_id) params.set("fromTemplate", template_id);
+        if (date) params.set("date", date);
+        return `?${params.toString()}`;
+    }
+
     onMount(async () => {
         categories = await invoke("list_exercise_categories");
     });
@@ -173,7 +180,7 @@
                 id: template_id_numeric,
                 exerciseId: exercise.id,
             });
-            goto(`/templates?date=${date}`, {
+            goto(`/templates${createParams()}`, {
                 replaceState: true,
             });
             return;
@@ -192,10 +199,10 @@
 
     function goBack() {
         if (template_id) {
-            goto(`/templates?date=${date}`);
+            goto(`/templates${createParams()}`);
             return;
         }
-        goto(date ? `/?date=${date}` : "/");
+        goto(`/${createParams()}`);
     }
 
     const categoryActions = [

@@ -59,26 +59,25 @@ export function exerciseHrefs(
   fromDate: string,
   fromTemplate: string,
 ) {
-  const from = workoutExerciseId ? `?from=${workoutExerciseId}` : "";
-  const template = fromTemplate ? `?fromTemplate=${fromTemplate}` : "";
+  let params = new URLSearchParams();
+  if (workoutExerciseId) params.set("from", workoutExerciseId.toString());
+  if (fromTemplate) params.set("fromTemplate", fromTemplate);
+  if (fromDate) params.set("date", fromDate);
+  const from = params.toString() ? `?${params.toString()}` : "";
   console.log(
     `exerciseHrefs: exerciseId=${exerciseId} workoutExerciseId=${workoutExerciseId} fromDate=${fromDate} fromTemplate=${fromTemplate}`,
   );
   let feedHref;
   if (fromTemplate) {
-    if (fromDate) {
-      feedHref = `/templates?date=${fromDate}`;
-    } else {
-      feedHref = "/templates";
-    }
+    feedHref = `/templates${from}`;
   } else {
-    feedHref = fromDate ? `/?date=${fromDate}` : "/";
+    feedHref = `/${from}`;
   }
   return {
     feedHref,
-    setsHref: `/exercise/${exerciseId}/${workoutExerciseId}${template}`,
-    historyHref: `/exercise/${exerciseId}/history${from}${template}`,
-    graphHref: `/exercise/${exerciseId}/graph${from}${template}`,
-    prsHref: `/exercise/${exerciseId}/prs${from}${template}`,
+    setsHref: `/exercise/${exerciseId}/${workoutExerciseId}${from}`,
+    historyHref: `/exercise/${exerciseId}/history${from}`,
+    graphHref: `/exercise/${exerciseId}/graph${from}`,
+    prsHref: `/exercise/${exerciseId}/prs${from}`,
   };
 }

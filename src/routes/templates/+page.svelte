@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { onMount, tick } from "svelte";
     import { invoke } from "$lib/tauri";
     import { goto } from "$app/navigation";
     import { Calendar, PlusIcon, Settings } from "lucide-svelte";
@@ -8,26 +8,42 @@
     import type { NamedId } from "$lib/exercise";
 
     const date = new URLSearchParams(location.search).get("date");
+    const targetTemplate = new URLSearchParams(location.search).get(
+        "fromTemplate",
+    );
 
-    let loading = $state(false);
     let templates = $state<NamedId[]>([]);
+
+    let scrolled = false;
+
+    function handleTemplateLoaded(id: number) {
+        if (scrolled) return;
+        if (id === Number(targetTemplate)) {
+            scrolled = true;
+            tick().then(() => scrollToTemplate(id));
+        }
+    }
 
     onMount(async () => {
         await listTemplates();
     });
 
-    async function listTemplates() {
-        loading = true;
-        invoke<NamedId[]>("list_templates", {}).then((result) => {
+    function scrollToTemplate(id: number) {
+        document
+            .getElementById(`template-${id}`)
+            ?.scrollIntoView({ behavior: "instant", block: "center" });
+    }
+
+    function listTemplates(): Promise<void> {
+        return invoke<NamedId[]>("list_templates", {}).then((result) => {
             templates = result.sort((a, b) => a.name.localeCompare(b.name));
-            loading = false;
         });
     }
 
     async function createTemplate() {
         const name = "New Template";
         await invoke("create_template", { name });
-        await listTemplates();
+        listTemplates();
     }
 </script>
 
@@ -53,7 +69,11 @@
 
     <div class="feed">
         {#each templates as template (template.id)}
-            <TemplateCard {template} {listTemplates} />
+            <TemplateCard
+                {template}
+                {listTemplates}
+                onLoaded={handleTemplateLoaded}
+            />
         {/each}
     </div>
 </div>
