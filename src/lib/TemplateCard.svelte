@@ -10,6 +10,7 @@
         ChevronRight,
         Dumbbell,
         X,
+        Trash,
         Trash2,
         Merge,
         Pencil,
@@ -69,8 +70,8 @@
     };
     const handleFinalize = (evt) => {
         exercises = evt.detail.items;
-        invoke("reorder_exercises", {
-            orderedWorkoutExerciseIds: exercises.map(
+        invoke("reorder_template_exercises", {
+            orderedTemplateExerciseIds: exercises.map(
                 (ex) => ex.workout_exercise_id,
             ),
         });
