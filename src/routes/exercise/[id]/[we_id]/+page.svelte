@@ -68,6 +68,7 @@
             exerciseId: exerciseId,
         });
         if (lastSetData) lastSet = lastSetData;
+        defaultToLastSet();
         sets = setsData;
     }
 
