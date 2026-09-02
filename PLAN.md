@@ -259,6 +259,45 @@ All of the new commands will be pretty much copy-pasted from their real-workout 
 
 ---
 
+---
+
+### 12. Publish to the iOS and Android app stores
+
+Current state: both mobile projects are initialized (`src-tauri/gen/android`, `src-tauri/gen/apple`), all Rust mobile targets are installed, and Android release APKs are built + signed via keystore env vars (`deploy.sh`). iOS has never been built or signed (`developmentTeam` is still a placeholder, `ExportOptions.plist` method is `debugging`).
+
+#### Phase 0 — Accounts and prerequisites (start immediately)
+
+- Enroll in Google Play Console ($25 one-time; new personal accounts need identity verification) and the Apple Developer Program ($99/yr; ~1–2 day approval).
+- Host a privacy policy (GitHub Pages is fine): all data stored locally on device, nothing collected, shared, or transmitted. Required by both stores.
+- Decide the real app name (display name + store listing). Not blocking for builds; "Fitness Notes" stays the placeholder until then.
+
+#### Phase 1 — Android → Play Store (first launch)
+
+- Build AABs for Play: `pnpm tauri android build --aab` (deploy.sh builds APK + AAB; APK stays for device sideloading).
+- Back up the release keystore + passwords durably — losing it complicates updates. The env-var signing config is reused as the Play upload key.
+- Verify generated `targetSdk` ≥ 35 (Play requirement for new apps) and the manifest app label.
+- Play Console setup: store listing (title, descriptions, 512×512 icon, 1024×500 feature graphic, 2+ phone screenshots), content rating questionnaire, Data safety form (declare: no data collected/shared — all local), privacy policy URL.
+- Closed test: new personal Play accounts must run **12 opted-in testers continuously for 14 days** before production access is granted. Recruit testers early — longest lead-time item.
+- Rollout: internal → closed (satisfies the requirement) → production.
+
+#### Phase 2 — iOS bring-up (in parallel with Phase 1 waiting periods)
+
+- Set real Team ID in `tauri.conf.json` → `bundle.iOS.developmentTeam`.
+- `pnpm tauri ios dev` on simulator, then a real device. Big unknown — first-ever iOS run. Expect fixes for: safe areas/notches, keyboard insets, export/restore flow (`tauri-plugin-dialog` `save` is desktop-only → needs share-sheet fallback or platform gating), general touch feel.
+- Set `ExportOptions.plist` method to `app-store`, then `pnpm tauri ios build` → upload via Xcode or Transporter.
+- App Store Connect: app record (bundle ID `com.vegardbroen.fitness-notes` is valid for iOS), listing (description, keywords, screenshots at required iPhone sizes, age rating, privacy labels — nothing collected), TestFlight, then App Review (Health & Fitness category; no special entitlements needed).
+
+#### Phase 3 — Release mechanics
+
+- Bump `version` in `tauri.conf.json` each release; Android needs an incrementing `versionCode`, iOS an incrementing build number.
+- Optional later: GitHub Actions (`tauri-action`) for automated signed mobile builds.
+
+#### Timeline estimate
+
+Android in production ~3–4 weeks out (dominated by the 14-day closed test + listing prep). iOS after that, dominated by first-run device debugging; App Review itself is ~1–2 days once submitted.
+
+---
+
 ## Implementation order
 
 1. ~~**Migration infrastructure**~~ ✓ done
@@ -274,6 +313,7 @@ All of the new commands will be pretty much copy-pasted from their real-workout 
 11. **Complete body tracker** (graph + PRs)
 12. **Season PRs** — depends on settings
 13. **Analysis page** — most complex, last
+14. **Publish to app stores** — Phase 0 (accounts/privacy policy) anytime; Android first (section 12), iOS bring-up in parallel
 
 ---
 
