@@ -3,6 +3,7 @@
     import { writeFile } from "@tauri-apps/plugin-fs";
     import type { NamedId } from "$lib/exercise";
     import type { Metric } from "$lib/body";
+    import { licenseGroups } from "$lib/licenses";
     import { invoke } from "$lib/tauri";
     import { onMount } from "svelte";
 
@@ -77,7 +78,8 @@
           }
         | { name: "body_importing" }
         | { name: "body_done"; result: BodyImportResult }
-        | { name: "export_done"; path: string };
+        | { name: "export_done"; path: string }
+        | { name: "licenses" };
 
     let phase = $state<Phase>({ name: "idle" });
     let fileInput = $state<HTMLInputElement>();
@@ -588,6 +590,18 @@
                 </div>
             {/if}
         </div>
+        <div class="settings-section">
+            <h2 class="settings-section-title">About</h2>
+            <div class="settings-row">
+                <span>Open source licenses</span>
+                <button
+                    class="add-btn-inline"
+                    onclick={() => (phase = { name: "licenses" })}
+                >
+                    View
+                </button>
+            </div>
+        </div>
     {:else if phase.name === "resolving"}
         <p class="settings-section-title">
             {phase.unknowns.length} exercise{phase.unknowns.length === 1
@@ -808,5 +822,30 @@
             Exported to {phase.path}
         </div>
         <button class="add-btn" onclick={reset}>Ok</button>
+    {:else if phase.name === "licenses"}
+        <div class="history-header">
+            <button class="back-btn" onclick={reset}
+                ><ArrowLeft size={18} strokeWidth={1.5} /></button
+            >
+            <h1>Licenses</h1>
+        </div>
+        <div class="license-intro">
+            This app is licensed under the MIT License. It is built on open
+            source software:
+        </div>
+        {#each licenseGroups as group (group.category + group.license)}
+            <div class="settings-section license-group">
+                <h2 class="settings-section-title">
+                    {group.category} · {group.license}
+                </h2>
+                <p class="license-packages">{group.packages.join(" · ")}</p>
+                {#if group.copyrights.length > 0}
+                    <pre class="license-copyrights"
+                        >{group.copyrights.join("\n")}</pre
+                    >
+                {/if}
+                <pre class="license-text">{group.text}</pre>
+            </div>
+        {/each}
     {/if}
 </div>
