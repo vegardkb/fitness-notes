@@ -4,7 +4,7 @@
     import { selectionFeedback } from "@tauri-apps/plugin-haptics";
 
     import { onMount } from "svelte";
-    import { dndzone } from "svelte-dnd-action";
+    import { dndzone, type DndEvent } from "svelte-dnd-action";
     import {
         GripVertical,
         ChevronRight,
@@ -70,10 +70,14 @@
         onLoaded?.(nameId.id);
     });
 
-    const handleConsider = (evt) => {
+    const handleConsider = (
+        evt: CustomEvent<DndEvent<ExerciseWithSets>>,
+    ) => {
         exercises = evt.detail.items;
     };
-    const handleFinalize = (evt) => {
+    const handleFinalize = (
+        evt: CustomEvent<DndEvent<ExerciseWithSets>>,
+    ) => {
         exercises = evt.detail.items;
         invoke("reorder_template_exercises", {
             orderedTemplateExerciseIds: exercises.map(

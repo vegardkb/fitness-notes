@@ -5,7 +5,7 @@
     import { toast } from "$lib/toast";
 
     import { onMount } from "svelte";
-    import { dndzone } from "svelte-dnd-action";
+    import { dndzone, type DndEvent } from "svelte-dnd-action";
     import { formatDate } from "$lib/date";
     import {
         GripVertical,
@@ -58,10 +58,14 @@
 
     onMount(loadExercises);
 
-    const handleConsider = (evt) => {
+    const handleConsider = (
+        evt: CustomEvent<DndEvent<ExerciseWithSets>>,
+    ) => {
         exercises = evt.detail.items;
     };
-    const handleFinalize = (evt) => {
+    const handleFinalize = (
+        evt: CustomEvent<DndEvent<ExerciseWithSets>>,
+    ) => {
         exercises = evt.detail.items;
         invoke("reorder_exercises", {
             orderedWorkoutExerciseIds: exercises.map(
