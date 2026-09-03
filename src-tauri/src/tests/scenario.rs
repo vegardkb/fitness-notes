@@ -57,24 +57,12 @@ fn test_add_three_sets_on_two_days() {
     assert_eq!(exercise_history[1].date, "2024-01-01");
     assert_eq!(exercise_history[0].date, "2024-01-11");
 
-    assert_eq!(
-        exercise_history[1].exercises[0].sets[0].is_current_pr,
-        false
-    );
-    assert_eq!(
-        exercise_history[1].exercises[0].sets[0].was_pr_at_time,
-        true
-    );
-    assert_eq!(exercise_history[1].exercises[0].sets[1].is_current_pr, true);
-    assert_eq!(
-        exercise_history[1].exercises[0].sets[1].was_pr_at_time,
-        true
-    );
-    assert_eq!(exercise_history[0].exercises[0].sets[0].is_current_pr, true);
-    assert_eq!(
-        exercise_history[0].exercises[0].sets[0].was_pr_at_time,
-        true
-    );
+    assert!(!exercise_history[1].exercises[0].sets[0].is_current_pr);
+    assert!(exercise_history[1].exercises[0].sets[0].was_pr_at_time);
+    assert!(exercise_history[1].exercises[0].sets[1].is_current_pr);
+    assert!(exercise_history[1].exercises[0].sets[1].was_pr_at_time);
+    assert!(exercise_history[0].exercises[0].sets[0].is_current_pr);
+    assert!(exercise_history[0].exercises[0].sets[0].was_pr_at_time);
 }
 
 #[test]

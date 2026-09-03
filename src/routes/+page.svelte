@@ -8,6 +8,7 @@
 
 <script lang="ts">
     import { onMount } from "svelte";
+    import { SvelteSet } from "svelte/reactivity";
     import { Calendar, Settings } from "lucide-svelte";
     import DayCard from "$lib/DayCard.svelte";
     import { offsetDate, todayStr, isValidDate } from "$lib/date";
@@ -37,7 +38,7 @@
     }
 
     function loadRange(from: string, to: string) {
-        const incoming = new Set(datesBetween(from, to));
+        const incoming = new SvelteSet(datesBetween(from, to));
         const existing = new Set(days);
         for (const d of existing) incoming.add(d);
         days = Array.from(incoming).sort().reverse();

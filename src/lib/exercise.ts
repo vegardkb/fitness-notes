@@ -1,5 +1,3 @@
-import { todayStr } from "$lib/date";
-
 export type Set = {
   id: number;
   set_order: number;
@@ -59,7 +57,7 @@ export function exerciseHrefs(
   fromDate: string,
   fromTemplate: string,
 ) {
-  let params = new URLSearchParams();
+  const params = new URLSearchParams();
   if (workoutExerciseId) params.set("from", workoutExerciseId.toString());
   if (fromTemplate) params.set("fromTemplate", fromTemplate);
   if (fromDate) params.set("date", fromDate);

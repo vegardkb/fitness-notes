@@ -2,7 +2,6 @@ import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import os from "node:os";
 import { spawnSync } from "node:child_process";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -58,110 +57,27 @@ function collectNpm(dir, deps) {
 const pkgJson = readPkg(root);
 collectNpm(root, pkgJson.dependencies);
 
-const registryRoots = (() => {
-    const src = path.join(os.homedir(), ".cargo", "registry", "src");
-    if (!existsSync(src)) return [];
-    return readdirSync(src).map((d) => path.join(src, d));
-})();
-
-function crateDir(name, version) {
-    const base = version.split("+")[0];
-    for (const r of registryRoots) {
-        for (const v of [version, base]) {
-            const p = path.join(r, `${name}-${v}`);
-            if (existsSync(p)) return p;
-        }
-    }
-    for (const r of registryRoots) {
-        if (!existsSync(r)) continue;
-        let entries;
-        try {
-            entries = readdirSync(r);
-        } catch {
-            continue;
-        }
-        const hit = entries.find((d) => d.startsWith(`${name}-${base}`));
-        if (hit) return path.join(r, hit);
-    }
-    return null;
-}
-
-const meta = JSON.parse(
-    spawnSync("cargo", ["metadata", "--format-version", "1"], {
-        cwd: path.join(root, "src-tauri"),
-        encoding: "utf8",
-        maxBuffer: 1 << 26,
-    }).stdout,
+const texts = JSON.parse(
+    readFileSync(new URL("./license-texts.json", import.meta.url), "utf8"),
 );
+
+const cargo = spawnSync("cargo", ["metadata", "--format-version", "1"], {
+    cwd: path.join(root, "src-tauri"),
+    encoding: "utf8",
+    maxBuffer: 1 << 26,
+});
+if (cargo.error || cargo.status !== 0 || !cargo.stdout) {
+    console.error(
+        `cargo metadata failed (exit ${cargo.status ?? "?"}): ${(cargo.stderr || cargo.error || "").toString().slice(0, 500)}`,
+    );
+    process.exit(1);
+}
+const meta = JSON.parse(cargo.stdout);
 const ws = new Set(meta.workspace_members);
 const crates = meta.packages
     .filter((p) => !ws.has(p.id))
-    .map((p) => ({
-        name: p.name,
-        version: p.version,
-        license: licenseString(p.license),
-        dir: crateDir(p.name, p.version),
-    }))
+    .map((p) => ({ name: p.name, version: p.version, license: licenseString(p.license) }))
     .sort((a, b) => a.name.localeCompare(b.name));
-
-const texts = {};
-function normalize(t) {
-    return t
-        .replace(/\r\n/g, "\n")
-        .split("\n")
-        .filter((l) => !/^Copyright/i.test(l))
-        .join("\n")
-        .replace(/\n{3,}/g, "\n\n")
-        .trim();
-}
-
-function detect(content) {
-    if (/Mozilla Public License(,)? Version 2/i.test(content)) return "MPL-2.0";
-    if (/SIL Open Font License/i.test(content)) return "OFL-1.1";
-    if (/UNICODE LICENSE V3|Unicode License Agreement/i.test(content)) return "Unicode-3.0";
-    if (/Apache License\s*\n?\s*Version 2/i.test(content)) return "Apache-2.0";
-    if (/Permission is hereby granted, free of charge/i.test(content)) {
-        return /shall be included in all copies|substantial portions/i.test(content)
-            ? "MIT"
-            : "MIT-0";
-    }
-    if (/Permission to use, copy, modify, and\/or distribute/i.test(content)) return "ISC";
-    if (/Redistribution and use in source and binary forms/i.test(content)) {
-        return /Neither the name/i.test(content) ? "BSD-3-Clause" : "BSD-2-Clause";
-    }
-    if (/free and unencumbered software released into the public domain/i.test(content))
-        return "Unlicense";
-    if (/CC0 1\.0 Universal/i.test(content)) return "CC0-1.0";
-    if (/provided ['"]as-is['"], without any express/i.test(content)) return "Zlib";
-    if (/Blue Oak Model License/i.test(content)) return "BlueOak-1.0.0";
-    if (/Boost Software License/i.test(content)) return "BSL-1.0";
-    return null;
-}
-
-function scanTexts(dirs) {
-    for (const d of dirs) {
-        if (!d || !existsSync(d)) continue;
-        let files;
-        try {
-            files = readdirSync(d);
-        } catch {
-            continue;
-        }
-        for (const f of files) {
-            if (!/^LICENSE/i.test(f)) continue;
-            let content;
-            try {
-                content = readFileSync(path.join(d, f), "utf8");
-            } catch {
-                continue;
-            }
-            const id = detect(content);
-            if (id && !texts[id]) texts[id] = normalize(content);
-        }
-    }
-}
-
-scanTexts([...npm.values().map((p) => p.dir), ...crates.map((c) => c.dir)]);
 
 function copyrightLines(dir) {
     if (!dir || !existsSync(dir)) return [];

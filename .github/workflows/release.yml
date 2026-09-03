@@ -1,0 +1,117 @@
+name: Release
+
+# Tag-triggered store builds. Before the first tag push, add repo secrets:
+#   ANDROID_KEYSTORE_BASE64  — base64 of the release keystore (`base64 -i keystore.jks`)
+#   ANDROID_KEYSTORE_PASS    — keystore password
+#   ANDROID_KEY_ALIAS        — key alias
+#   ANDROID_KEY_PASS         — key password
+# The Android job publishes signed AAB + APK to a GitHub Release (sideload channel
+# for closed testers; the AAB is uploaded to Play Console manually for now).
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  version-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag matches tauri.conf.json version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          CONF=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          if [ "$TAG" != "$CONF" ]; then
+            echo "::error::Tag v$TAG does not match tauri.conf.json version $CONF"
+            exit 1
+          fi
+
+  android:
+    needs: version-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux system deps (Tauri)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;30.0.14904198" > /dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/30.0.14904198" >> "$GITHUB_ENV"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Decode signing keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$GITHUB_WORKSPACE/keystore.jks"
+
+      - name: Build signed APK + AAB
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/keystore.jks
+          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASS: ${{ secrets.ANDROID_KEY_PASS }}
+        run: pnpm tauri android build --apk --aab
+
+      - name: Collect artifacts
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p artifacts
+          cp src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk \
+            "artifacts/FitnessNotes-$VERSION-universal.apk"
+          cp src-tauri/gen/android/app/build/outputs/bundle/universalRelease/app-universal-release.aab \
+            "artifacts/FitnessNotes-$VERSION.aab"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+
+      # iOS: enable after the first successful local `pnpm tauri ios build`.
+      # Requires a macos runner, an Apple distribution certificate (.p12),
+      # a provisioning profile and an App Store Connect API key as secrets.
+      # ios:
+      #   needs: version-check
+      #   runs-on: macos-latest
+      #   steps:
+      #     - uses: actions/checkout@v4
+      #     - uses: pnpm/action-setup@v4
+      #     - uses: actions/setup-node@v4
+      #       with:
+      #         node-version: 22
+      #         cache: pnpm
+      #     - uses: dtolnay/rust-toolchain@stable
+      #       with:
+      #         targets: aarch64-apple-ios,aarch64-apple-ios-sim
+      #     - uses: Swatinem/rust-cache@v2
+      #       with:
+      #         workspaces: src-tauri
+      #     - run: pnpm install --frozen-lockfile
+      #     - run: pnpm tauri ios build --export-method app-store

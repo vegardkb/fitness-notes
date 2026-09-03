@@ -2,7 +2,7 @@
     import { onMount, tick } from "svelte";
     import { invoke } from "$lib/tauri";
     import { goto } from "$app/navigation";
-    import { Calendar, PlusIcon, Settings } from "lucide-svelte";
+    import { PlusIcon } from "lucide-svelte";
 
     import TemplateCard from "$lib/TemplateCard.svelte";
     import type { NamedId } from "$lib/exercise";
