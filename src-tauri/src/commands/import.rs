@@ -352,9 +352,10 @@ pub fn import_exercise_rows_inner(
         last_eid = Some(exercise_id);
 
         let key = (workout_id, exercise_id);
-        let id = workout_exercise_to_id.get(&key);
-        let workout_exercise_id = if id.is_some() && !different_we {
-            *id.unwrap()
+        let workout_exercise_id = if let Some(id) =
+            workout_exercise_to_id.get(&key).filter(|_| !different_we)
+        {
+            *id
         } else {
             let next_ex_order: i64 = conn
                 .query_row(

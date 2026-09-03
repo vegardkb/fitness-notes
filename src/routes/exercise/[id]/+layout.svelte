@@ -8,7 +8,6 @@
     let { children } = $props();
     const fromTemplate = page.url.searchParams.get("fromTemplate") ?? "";
     const fromDate = page.url.searchParams.get("fromDate") ?? "";
-    $inspect(fromTemplate);
 
     let exerciseId = $derived(Number(page.params.id));
     let workoutExerciseContext: WorkoutExerciseContext = $state({

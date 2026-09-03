@@ -1,11 +1,8 @@
 <script lang="ts">
-    import { page } from "$app/state";
     import { invoke } from "$lib/tauri";
     import { onMount } from "svelte";
     import type { Measurement, Metric } from "$lib/body";
     import { formatWeight } from "$lib/exercise";
-
-    const exerciseId = $derived(Number(page.params.id ?? "0"));
 
     type MetricRange = {
         metric: Metric;

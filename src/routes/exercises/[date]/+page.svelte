@@ -3,6 +3,7 @@
     import { goto } from "$app/navigation";
     import { invoke } from "$lib/tauri";
     import { onMount } from "svelte";
+    import { SvelteURLSearchParams } from "svelte/reactivity";
     import PlusIcon from "$lib/icons/PlusIcon.svelte";
     import SelectList from "$lib/SelectList.svelte";
     import { toast } from "$lib/toast";
@@ -32,7 +33,7 @@
     let mergeExerciseTo = $state<NamedId | null>(null);
 
     function createParams() {
-        let params = new URLSearchParams();
+        let params = new SvelteURLSearchParams();
         if (template_id) params.set("fromTemplate", template_id);
         if (date) params.set("date", date);
         return `?${params.toString()}`;

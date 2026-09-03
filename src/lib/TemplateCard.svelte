@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { goto, invalidateAll } from "$app/navigation";
+    import { goto } from "$app/navigation";
     import { invoke } from "$lib/tauri";
     import { selectionFeedback } from "@tauri-apps/plugin-haptics";
 
@@ -89,9 +89,6 @@
     };
     const startDrag = () => {
         dragDisabled = false;
-    };
-    const stopDrag = () => {
-        dragDisabled = true;
     };
 
     let touchStartX = $state(0);

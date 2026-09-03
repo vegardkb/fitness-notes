@@ -78,9 +78,6 @@
     const startDrag = () => {
         dragDisabled = false;
     };
-    const stopDrag = () => {
-        dragDisabled = true;
-    };
 
     let touchStartX = $state(0);
     let touchStartY = $state(0);
