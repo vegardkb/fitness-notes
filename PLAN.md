@@ -177,6 +177,8 @@ Add an analysis icon to the header nav in `src/routes/+layout.svelte`.
 Possible interesting analysis:
 - Pareto frontier (reps vs highest weight for rep count), comparing exercises and season could be interesting, as well as the shape of the curve. 
 
+**Extension**: full statistical modeling for this page is designed in §13 (posterior ribbons, couplings, forecasts). The simple correlation explorer above remains the v1.
+
 ---
 
 ### 10. Data safety
@@ -298,6 +300,89 @@ Android in production ~3–4 weeks out (dominated by the 14-day closed test + li
 
 ---
 
+### 13. Statistical modeling (extends §9 Analysis page)
+
+**Status: designed, not started. Blocked until the in-progress refactor lands.**
+
+#### Design decisions (settled)
+
+- **Joint linear-Gaussian state-space model** over all variables (body metrics + exercise e1RM). Kalman filter + RTS smoother give exact joint posteriors — every variable's history conditions on all data from all variables, both directions in time. Parameters via EM (Shumway–Stoffer), i.e. empirical Bayes: no MCMC, no Python, phone-cheap.
+- **Tree factor structure** for exercises — identified by construction (no rotation ambiguity): global strength factor `g_t` → per-movement-pattern factors `f_c,t = λ_c·g_t + η_c` (`Var(η_c)=1`, `λ_c ≥ 0`); each exercise loads only on its pattern factor. Rationale: a rare variant (paused squat) pools information through its pattern factor (low-bar/high-bar squat, leg press) — a better prior than a single global factor. Rank-1-global and free-d variants were considered and dropped for now; free-d may come later behind the same `FactorSpec` interface (PCA → varimax → anchored EM).
+- **Static couplings** `β_jk` (exercise ← smoothed body-metric levels), admitted per-coupling via exact marginal likelihood (with/without fit, BIC-penalized). Time-varying couplings are deliberately NOT in the joint model (a time-varying coefficient × a latent state is bilinear — no exact filtering); they live in a separate on-demand diagnostics layer.
+- **Variant offsets** `δ` per (exercise, variant) absorb known measurement breaks (gym/machine changes, new bathroom scale) so levels and couplings stay clean — a break is a known, dated, additive instrument change and belongs in the observation equation, not in time-varying coefficients. Ridge-shrunk toward 0, reference variant pinned at 0, user-visible ("Gym X chest press ≈ +4 kg vs reference").
+- **RIR**: optional per-set field. `e1RM = w·(1 + (reps + RIR)/30)` when present (Epley assumes failure); lower observation noise for RIR sets. Without RIR the model estimates a *performance index* (strength and effort are confounded — slow effort changes cannot be separated from strength gains); UI wording should reflect that. **PR logic stays on raw (weight, reps)** — RIR is modeling metadata only.
+- **Clean data via detection, not policing**: the online filter's standardized innovation flags implausible logs → toast ("looks off — different machine?") → one-tap tag/break-date assignment; offsets learn the jump retroactively.
+
+#### Model
+
+```
+State (all random walks, process noise Q·Δt — irregular gaps handled natively, missing days = predict-only):
+  ℓ_i,t   body-metric levels (log scale for mass-type metrics)
+  ℓ_j,t   exercise levels
+  g_t     global strength factor
+  f_c,t = λ_c·g_t + η_c ,  Var(η_c) = 1, λ_c ≥ 0        pattern factors, c = 1..C
+
+Observation:
+  body metric i:   y_i,t = ℓ_i,t + ε_i,t
+  exercise j:      y_j,t = ℓ_j,t + b_j·f_cat(j),t + Σ_k β_jk·ℓ^body_k,t
+                         + δ_j,variant(j,t) + ε_j,t
+```
+
+- e1RM observation noise `h·(1 + reps/30)²` (extrapolation grows with reps), halved when RIR present. Outlier guard: standardized innovation > 3σ → inflate that observation's noise.
+- Estimation: square-root Kalman filter (obs-by-obs updates, `H` diagonal) → RTS smoother + lag-one covariances → closed-form M-step for all variances; regression-on-smoothed-moments for `b_j, λ_c, β_jk, δ`. ~10–50 EM iterations.
+- Perf budget: state dim ≈ 80–100 (active exercises only, ≥5 sets in window) → full refit ≲ 2–3 s on a phone; run on app open / debounced on data change, cache results. Documented fallback if old phones struggle: block the filter (body block exact; exercises conditioned on smoothed body/factor paths).
+- Diagnostics layer (on demand, separate): two-stage plug-in filters → time-varying `β_jk(t)` paths; windowed partial correlations on smoothed innovations. Doubles as a detector for undeclared breaks (residual level shift aligned with a date → prompt).
+
+#### Data model (provisionally v11–v12 — renumber after seasons v8–v10 land)
+
+```sql
+ALTER TABLE workouts          ADD COLUMN tag     TEXT;  -- gym/location context, free text, nullable
+ALTER TABLE workout_exercises ADD COLUMN variant TEXT;  -- per-entry "different machine" override, nullable
+ALTER TABLE exercises         ADD COLUMN pattern TEXT;  -- optional movement-pattern group (factor group)
+ALTER TABLE sets              ADD COLUMN rir     INTEGER;             -- nullable, per set
+ALTER TABLE user_settings     ADD COLUMN track_rir INTEGER DEFAULT 0;
+```
+
+- Effective variant key: `coalesce(workout_exercises.variant, workouts.tag, 'default')` — offsets attach to (exercise, variant) pairs. No new tables or FKs; tag autocomplete = `SELECT DISTINCT tag FROM workouts WHERE tag IS NOT NULL`.
+- `estimate_1rm(weight, reps, rir)` centralized in one helper; the existing exercise graph adopts it.
+
+#### UX
+
+- Settings: "Track RIR" toggle → optional RIR stepper on set rows (remembers last value per exercise).
+- Workout tag on the day card / workout header: sticky (defaults to last used), autocomplete.
+- "Different machine…" in the exercise-entry ⋯ menu (variant override, pre-filled with inherited tag).
+- Pattern field in exercise edit (optional, suggested from existing values).
+- Analysis page additions: posterior ribbons (smoothed ± 2σ + forecast), couplings table (β, loadings), offsets view, time-varying diagnostics toggle, innovation-flag toast flow.
+
+#### Stats module (`src-tauri/src/stats/`, only new dep: `faer` or `nalgebra`)
+
+- `filter.rs` — square-root Kalman, obs-by-obs updates, generic over the observation matrix
+- `smoother.rs` — RTS smoother + lag-one covariances
+- `fit.rs` — EM loop (closed-form variance updates, moments regression for loadings/couplings/offsets)
+- `factors.rs` — `FactorSpec` (factor list + loading pattern; tree now, free-d later)
+- `diagnostics.rs` — two-stage β_t paths, windowed partial correlations
+
+New commands: `posterior_series`, `forecast`, `get_couplings`, `get_offsets`, `coupling_path`, `get_innovation_flags`.
+
+#### Validation
+
+- Synthetic-data recovery of Θ (incl. a simulated offset jump and tree factors)
+- Held-out forecasts beat naive last-value baseline, especially for sparse variants (the tree model's success criterion)
+- Innovation whiteness (no residual autocorrelation ⇒ trend structure adequate)
+- Unit tests: `estimate_1rm`, variant-key resolution
+
+#### Implementation order
+
+0. **Blocked: in-progress refactor**
+1. Migrations + `estimate_1rm` + RIR/tag/variant/pattern UX — ships value before any model
+2. Stats core (filter/smoother/EM/FactorSpec) + per-variable posteriors powering the existing exercise/body graphs
+3. Joint tree model: factors, offsets, β admission via marginal likelihood; commands + analysis UI
+4. Diagnostics layer + break detector
+5. Clean-data anomaly loop (innovation toast → tag/break-date repair)
+6. Later: free-d factors behind `FactorSpec`
+
+---
+
 ## Implementation order
 
 1. ~~**Migration infrastructure**~~ ✓ done
@@ -314,6 +399,7 @@ Android in production ~3–4 weeks out (dominated by the 14-day closed test + li
 12. **Season PRs** — depends on settings
 13. **Analysis page** — most complex, last
 14. **Publish to app stores** — Phase 0 (accounts/privacy policy) anytime; Android first (section 12), iOS bring-up in parallel
+15. **Statistical modeling** (section 13) — blocked on the in-progress refactor; phase 1 (migrations + RIR/tag/variant/pattern UX) ships value before the model itself
 
 ---
 
