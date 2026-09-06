@@ -1,0 +1,54 @@
+name: WebDriver
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  webdriver:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Tauri Linux build deps + xvfb for a virtual display (WKWebView needs
+      # one). The embedded WebDriver server runs inside the app, so no
+      # external tauri-driver/webkit2gtk-driver is required.
+      - name: Install Linux system deps (Tauri + display)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev xvfb
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # release build with the wdio fixtures feature + separate app identifier
+      - name: Build test binary
+        run: pnpm build:wdio
+
+      # disable the GPU DMA renderer — WebKitGTK crashes headless without it
+      - name: Run WDIO tests
+        run: xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm wdio
+        env:
+          WEBKIT_DISABLE_DMABUF_RENDERER: 1
+
+      - name: Upload WDIO logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wdio-logs
+          path: logs/
+          if-no-files-found: ignore

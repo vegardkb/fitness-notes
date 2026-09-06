@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // ambient describe/it and the typed browser/globals objects for specs
+    "types": ["@wdio/mocha-framework", "@wdio/globals"]
+  },
+  "include": ["."]
+}
