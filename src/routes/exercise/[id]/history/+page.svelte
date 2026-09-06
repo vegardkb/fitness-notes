@@ -36,7 +36,9 @@
                     <button
                         class="exercise-card-header"
                         onclick={() =>
-                            goto(`/exercise/${exerciseId}/${day.date}`)}
+                            goto(
+                                `/exercise/${exerciseId}/${day.exercises[0].workout_exercise_id}`,
+                            )}
                     >
                         <span>{formatDate(day.date)}</span>
                         <span class="muted"

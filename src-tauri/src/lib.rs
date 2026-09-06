@@ -39,6 +39,9 @@ mod commands;
 mod database;
 mod models;
 
+#[cfg(feature = "wdio")]
+mod test_fixtures;
+
 #[cfg(test)]
 mod tests;
 
@@ -53,6 +56,13 @@ pub fn run() {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
         builder = builder.plugin(tauri_plugin_haptics::init());
+    }
+
+    #[cfg(feature = "wdio")]
+    {
+        builder = builder
+            .plugin(tauri_plugin_wdio::init())
+            .plugin(tauri_plugin_wdio_webdriver::init());
     }
 
     builder
@@ -144,6 +154,10 @@ fn initialize_db(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     let conn = rusqlite::Connection::open(&db_path)?;
     conn.execute_batch("PRAGMA journal_mode=WAL;")?;
     database::run_migrations(&conn)?;
+
+    #[cfg(feature = "wdio")]
+    test_fixtures::reset_and_seed(&conn)?;
+
     app.manage(std::sync::Mutex::new(conn));
     Ok(())
 }
@@ -184,7 +198,11 @@ fn today_str() -> String {
         .unwrap_or_default()
         .as_secs() as i64
         / 86400;
-    // Gregorian calendar from days since Unix epoch (Howard Hinnant's algorithm)
+    gregorian_from_days(days)
+}
+
+// Gregorian calendar from days since Unix epoch (Howard Hinnant's algorithm)
+pub(crate) fn gregorian_from_days(days: i64) -> String {
     let z = days + 719468;
     let era = (if z >= 0 { z } else { z - 146096 }) / 146097;
     let doe = z - era * 146097;

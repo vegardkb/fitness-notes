@@ -98,7 +98,7 @@
         }
     }
 
-    let timer = $state<number | null>(null);
+    let timer = $state<ReturnType<typeof setTimeout> | null>(null);
     async function startHold(we_id: number) {
         timer = setTimeout(async () => {
             await selectionFeedback();

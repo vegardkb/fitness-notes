@@ -17,7 +17,7 @@
 </script>
 
 <div class="history-header">
-    <a class="back-btn" href={props.feedHref}
+    <a class="back-btn" href={props.feedHref} aria-label="Back"
         ><ArrowLeft size={18} strokeWidth={1.5} /></a
     >
     {#if props.activeTab === "sets"}
